@@ -27,6 +27,8 @@
 
 #define NR_CHANS	1
 
+static spinlock_t lock;
+
 struct phytium_mbox_link {
 	unsigned int irq;
 	void __iomem *tx_reg;
@@ -45,14 +47,19 @@ static irqreturn_t phytium_mbox_rx_irq(int irq, void *ch)
 	struct mbox_chan *chan = ch;
 	struct phytium_mbox_link *mlink = chan->con_priv;
 	u32 val;
+	unsigned long flags = 0;
 
+	spin_lock_irqsave(&lock, flags);
 	val = readl_relaxed(mlink->rx_reg + INTR_STAT);
+	spin_unlock_irqrestore(&lock, flags);
 	if (!val)
 		return IRQ_NONE;
 
 	mbox_chan_received_data(chan, (void *)&val);
 
+	spin_lock_irqsave(&lock, flags);
 	writel_relaxed(val, mlink->rx_reg + INTR_CLR);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -61,8 +68,11 @@ static int phytium_mbox_send_data(struct mbox_chan *chan, void *data)
 {
 	struct phytium_mbox_link *mlink = chan->con_priv;
 	u32 *arg = data;
+	unsigned long flags = 0;
 
+	spin_lock_irqsave(&lock, flags);
 	writel_relaxed(*arg, mlink->tx_reg + INTR_SET);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return 0;
 }
@@ -72,9 +82,12 @@ static int phytium_mbox_startup(struct mbox_chan *chan)
 	struct phytium_mbox_link *mlink = chan->con_priv;
 	u32 val;
 	int ret;
+	unsigned long flags = 0;
 
+	spin_lock_irqsave(&lock, flags);
 	val = readl_relaxed(mlink->tx_reg + INTR_STAT);
 	writel_relaxed(val, mlink->tx_reg + INTR_CLR);
+	spin_unlock_irqrestore(&lock, flags);
 
 	ret = request_irq(mlink->irq, phytium_mbox_rx_irq,
 			  IRQF_SHARED, "phytium_mbox_link", chan);
@@ -95,8 +108,13 @@ static void phytium_mbox_shutdown(struct mbox_chan *chan)
 
 static bool phytium_mbox_last_tx_done(struct mbox_chan *chan)
 {
+	unsigned long flags;
 	struct phytium_mbox_link *mlink = chan->con_priv;
-	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT);
+	u32 val;
+
+	spin_lock_irqsave(&lock, flags);
+	val = readl_relaxed(mlink->tx_reg + INTR_STAT);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return (val == (u32)(1U << 31));
 }
@@ -125,6 +143,8 @@ static int phytium_mbox_probe(struct platform_device *pdev)
 	struct phytium_mbox *mbox;
 	struct resource *res;
 	int err, irq;
+
+	spin_lock_init(&lock);
 
 	/* Allocate memory for device */
 	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
