@@ -5428,7 +5428,7 @@ static const struct macb_config phytium_gem1p0_config = {
 	.dma_burst_length = 16,
 	.clk_init = phytium_clk_init,
 	.init = macb_init,
-	.jumbo_max_len = 10240,
+	.jumbo_max_len = 16360,
 	.sel_clk_hw = phytium_gem1p0_sel_clk,
 	.usrio = &macb_default_usrio,
 };
