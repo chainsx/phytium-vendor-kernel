@@ -69,8 +69,8 @@ void arch_release_task_struct(struct task_struct *tsk);
 #define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
 #define TIF_FSCHECK		5	/* Check FS is USER_DS on return */
 #define TIF_MTE_ASYNC_FAULT	6	/* MTE Asynchronous Tag Check Fault */
-#define TIF_NEED_RESCHED_LAZY	7
-#define TIF_NOTIFY_SIGNAL	8	/* signal notifications exist */
+#define TIF_NOTIFY_SIGNAL	7	/* signal notifications exist */
+#define TIF_NEED_RESCHED_LAZY	8
 #define TIF_SYSCALL_TRACE	9	/* syscall trace active */
 #define TIF_SYSCALL_AUDIT	10	/* syscall auditing */
 #define TIF_SYSCALL_TRACEPOINT	11	/* syscall tracepoint for ftrace */
