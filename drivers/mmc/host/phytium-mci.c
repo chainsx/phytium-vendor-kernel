@@ -756,6 +756,21 @@ static bool phytium_mci_cmd_done(struct phytium_mci_host *host, int events,
 			rsp[1] = readl(host->base + MCI_RESP2);
 			rsp[0] = readl(host->base + MCI_RESP3);
 		} else {
+			/*
+			 * Sometimes get ACMD41 cmd done irq but the respose index still the APP_CMD,
+			 * so polling the mci status entill the respose index change.
+			 */
+			if (cmd->opcode == SD_APP_OP_COND) {
+				int polling_cnt = 20;
+				while (MMC_APP_CMD == MCI_STATUS_RESPOSE_INDEX(readl(host->base + MCI_STATUS))) {
+					udelay(100);
+					polling_cnt --;
+					if (polling_cnt == 0) {
+						dev_info(host->dev, "hw respose index not equal cmd opcode, respose value may error\n");
+						break;
+					}
+				}
+			}
 			rsp[0] = readl(host->base + MCI_RESP0);
 		}
 
