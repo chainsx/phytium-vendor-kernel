@@ -352,7 +352,7 @@ static int azx_acquire_irq(struct azx *chip, int do_disconnect)
 	int irq_id = platform_get_irq(pdev, 0);
 	int err;
 
-	err = devm_request_irq(chip->card->dev, irq_id, azx_interrupt,
+	err = request_irq(irq_id, azx_interrupt,
 			     IRQF_SHARED, KBUILD_MODNAME, chip);
 	if (err) {
 		dev_err(chip->card->dev,
@@ -473,7 +473,7 @@ static int azx_suspend(struct device *dev)
 	azx_clear_irq_pending(chip);
 	azx_stop_chip(chip);
 	if (bus->irq >= 0) {
-		free_irq(bus->irq, chip);
+		free_irq(bus->irq, (void *)chip);
 		bus->irq = -1;
 	}
 
@@ -654,8 +654,10 @@ static int azx_free(struct azx *chip)
 		azx_stop_chip(chip);
 	}
 
-	if (bus->irq >= 0)
-		free_irq(bus->irq, (void *)chip);
+	if (bus->irq >= 0) {
+		free_irq(bus->irq, (void*)chip);
+		bus->irq = -1;
+	}
 
 	devm_iounmap(hddev, bus->remap_addr);
 
@@ -1036,7 +1038,10 @@ static int azx_probe_continue(struct azx *chip)
 	return err;
 
 out_free:
-	free_irq(bus->irq, (void *)chip);
+	if (bus->irq >= 0) {
+		free_irq(bus->irq, (void *)chip);
+		bus->irq = -1;
+	}
 	return err;
 }
 
