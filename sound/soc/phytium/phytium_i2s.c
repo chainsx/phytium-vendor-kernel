@@ -1375,20 +1375,19 @@ static int phytium_i2s_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_i2s_acpi_ids[] = {
+	{ "PHYT0016", 0 },
+	{ /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(acpi, phytium_i2s_acpi_ids);
+#endif
+
 static const struct of_device_id phytium_i2s_of_match[] = {
 	{ .compatible = "phytium,i2s", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, phytium_i2s_of_match);
-
-#ifdef CONFIG_ACPI
-static const struct acpi_device_id phytium_i2s_acpi_match[] = {
-	{ "PHYT0016", 0 },
-	{ }
-};
-#else
-#define phytium_i2s_acpi_match NULL
-#endif
 
 static struct platform_driver phytium_i2s_driver = {
 	.probe	= phytium_i2s_probe,
@@ -1396,7 +1395,7 @@ static struct platform_driver phytium_i2s_driver = {
 	.driver	= {
 		.name = "phytium-i2s",
 		.of_match_table = of_match_ptr(phytium_i2s_of_match),
-		.acpi_match_table = phytium_i2s_acpi_match,
+		.acpi_match_table = ACPI_PTR(phytium_i2s_acpi_ids),
 	},
 };
 
