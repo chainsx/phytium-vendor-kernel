@@ -314,7 +314,7 @@ u32 phytium_mci_cmd_prepare_raw_cmd(struct phytium_mci_host *host,
 	if (host->use_hold)
 		rawcmd |= (0x1 << 29);
 
-	return (rawcmd | (0x1 << 29) | (0x1 << 31));
+	return (rawcmd | (0x1 << 31));
 }
 
 static inline void
