@@ -665,8 +665,6 @@ static int azx_free(struct azx *chip)
 	azx_free_streams(chip);
 	snd_hdac_bus_exit(bus);
 
-	kfree(hda);
-
 	return 0;
 }
 
@@ -806,7 +804,6 @@ static int hda_ft_create(struct snd_card *card, struct platform_device *pdev,
 
 	err = azx_bus_init(chip, model[dev]);
 	if (err < 0) {
-		kfree(hda);
 		return err;
 	}
 
