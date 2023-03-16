@@ -8,6 +8,8 @@
 #include <sound/pcm_params.h>
 #include <sound/jack.h>
 
+#define DAI_CNT(pmdk_dai_) sizeof(pmdk_dai_)/sizeof(struct snd_soc_dai_link)
+
 struct pmdk_dp_private {
 	struct snd_soc_jack jack0;
 	struct snd_soc_jack jack1;
@@ -67,6 +69,7 @@ static int pmdk_dp0_init(struct snd_soc_pcm_runtime *runtime)
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
 		return ret;
 	}
+
 	snd_soc_component_set_jack(component, &priv->jack0, NULL);
 	return ret;
 }
@@ -122,28 +125,27 @@ SND_SOC_DAILINK_DEFS(pmdk_dp2_dai,
 	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.1346918658", "i2s-hifi")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
-static struct snd_soc_dai_link pmdk_dai0 = {
+static struct snd_soc_dai_link pmdk_dai_local[] = {
+{
 	.name = "Phytium dp0-audio",
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp0_init,
 	SND_SOC_DAILINK_REG(pmdk_dp0_dai),
-};
-
-static struct snd_soc_dai_link pmdk_dai1 = {
+},{
 	.name = "Phytium dp1-audio",
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp1_init,
 	SND_SOC_DAILINK_REG(pmdk_dp1_dai),
-};
-
-static struct snd_soc_dai_link pmdk_dai2 = {
+},
+{
 	.name = "Phytium dp2-audio",
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp2_init,
 	SND_SOC_DAILINK_REG(pmdk_dp2_dai),
+},
 };
 
 static struct snd_soc_card pmdk = {
@@ -163,29 +165,26 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 	struct snd_soc_card *card = &pmdk;
 	struct pmdk_dp_private *priv;
 	struct snd_soc_dai_link *pmdk_dai;
-	int num_dp = 2;
-
+	int num_dp = 2, dp_mask;
+	int i,j = 0;
 	card->dev = &pdev->dev;
+
 	device_property_read_u32(&pdev->dev, "num-dp", &num_dp);
+	device_property_read_u32(&pdev->dev, "dp-mask", &dp_mask);
 	pmdk_dai = devm_kzalloc(&pdev->dev, num_dp * sizeof(*pmdk_dai), GFP_KERNEL);
 	if (!pmdk_dai)
 		return -ENOMEM;
 
-	switch (num_dp) {
-	case 1:
-		pmdk_dai[0] = pmdk_dai0;
-		break;
-	case 2:
-		pmdk_dai[0] = pmdk_dai0;
-		pmdk_dai[1] = pmdk_dai1;
-		break;
-	case 3:
-		pmdk_dai[0] = pmdk_dai0;
-		pmdk_dai[1] = pmdk_dai1;
-		pmdk_dai[2] = pmdk_dai2;
-		break;
-	default:
+	if (!num_dp || num_dp > DAI_CNT(pmdk_dai_local))
 		return -EINVAL;
+
+	for(i = 0; i < num_dp; i++) {
+		for (; j < DAI_CNT(pmdk_dai_local); j++) {
+			if (BIT(j) & dp_mask) {
+				pmdk_dai[i] = pmdk_dai_local[j];
+				break;
+			}
+		}
 	}
 
 	card->dai_link = pmdk_dai;
