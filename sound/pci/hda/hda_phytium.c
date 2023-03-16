@@ -944,20 +944,24 @@ static const struct hda_controller_ops axi_hda_ops = {
 	.link_power = azx_ft_link_power,
 };
 
+static DECLARE_BITMAP(probed_devs, SNDRV_CARDS);
+
 static int hda_ft_probe(struct platform_device *pdev)
 {
 	const unsigned int driver_flags = AZX_DRIVER_FT;
-	static int dev;
 	struct snd_card *card;
 	struct hda_ft *hda;
 	struct azx *chip;
 	bool schedule_probe;
 	int err;
+	int dev;
+
+	dev = find_first_zero_bit(probed_devs, SNDRV_CARDS);
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
 	if (!enable[dev]) {
-		dev++;
+		set_bit(dev, probed_devs);
 		return -ENOENT;
 	}
 
@@ -981,7 +985,7 @@ static int hda_ft_probe(struct platform_device *pdev)
 	if (schedule_probe)
 		schedule_work(&hda->probe_work);
 
-	dev++;
+	set_bit(dev, probed_devs);
 	if (chip->disabled)
 		complete_all(&hda->probe_wait);
 	return 0;
@@ -1056,6 +1060,7 @@ static int hda_ft_remove(struct platform_device *pdev)
 		chip = card->private_data;
 		hda = container_of(chip, struct hda_ft, chip);
 		cancel_work_sync(&hda->probe_work);
+		clear_bit(chip->dev_index, probed_devs);
 
 		snd_card_free(card);
 		return 0;
