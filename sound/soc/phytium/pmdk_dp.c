@@ -165,12 +165,13 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 	struct snd_soc_card *card = &pmdk;
 	struct pmdk_dp_private *priv;
 	struct snd_soc_dai_link *pmdk_dai;
-	int num_dp = 2, dp_mask;
+	int num_dp = 2;
+	char dp_mask;
 	int i,j = 0;
 	card->dev = &pdev->dev;
 
 	device_property_read_u32(&pdev->dev, "num-dp", &num_dp);
-	device_property_read_u32(&pdev->dev, "dp-mask", &dp_mask);
+	device_property_read_u8(&pdev->dev, "dp-mask", &dp_mask);
 	pmdk_dai = devm_kzalloc(&pdev->dev, num_dp * sizeof(*pmdk_dai), GFP_KERNEL);
 	if (!pmdk_dai)
 		return -ENOMEM;
