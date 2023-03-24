@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/input.h>
+#include <linux/acpi.h>
 
 /*
  * Keypad Controller registers
@@ -393,6 +394,14 @@ open_err:
 	return -EIO;
 }
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_keypad_acpi_ids[] = {
+       { "PHYT0028", 0 },
+       { /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(acpi, phytium_keypad_acpi_ids);
+#endif
+
 #ifdef CONFIG_OF
 static const struct of_device_id phytium_keypad_of_match[] = {
 	{ .compatible = "phytium,keypad", },
@@ -409,7 +418,7 @@ static int phytium_keypad_probe(struct platform_device *pdev)
 	struct resource *res;
 	int irq, error, i, row, col;
 
-	if (!keymap_data && !pdev->dev.of_node) {
+	if (!keymap_data && !pdev->dev.of_node && !has_acpi_companion(&pdev->dev)) {
 		dev_err(&pdev->dev, "no keymap defined\n");
 		return -EINVAL;
 	}
@@ -561,6 +570,7 @@ static struct platform_driver phytium_keypad_driver = {
 		.name	= "phytium-keypad",
 		.pm	= &phytium_keypad_pm_ops,
 		.of_match_table = of_match_ptr(phytium_keypad_of_match),
+		.acpi_match_table = ACPI_PTR(phytium_keypad_acpi_ids),
 	},
 	.probe      = phytium_keypad_probe,
 	.remove     = phytium_keypad_remove,
