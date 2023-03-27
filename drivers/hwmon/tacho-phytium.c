@@ -298,18 +298,18 @@ static int phytium_tacho_probe(struct platform_device *pdev)
 		return PTR_ERR(tacho->base);
 	}
 	if (dev->of_node) {
-			tacho->clk = devm_clk_get(&pdev->dev, NULL);
-			if (IS_ERR(tacho->clk))
-				return PTR_ERR(tacho->clk);
-			ret = clk_prepare_enable(tacho->clk);
-			if (ret)
-				return ret;
+		tacho->clk = devm_clk_get(&pdev->dev, NULL);
+		if (IS_ERR(tacho->clk))
+			return PTR_ERR(tacho->clk);
+		ret = clk_prepare_enable(tacho->clk);
+		if (ret)
+			return ret;
 
-			tacho->freq = clk_get_rate(tacho->clk);
+		tacho->freq = clk_get_rate(tacho->clk);
 	} else if (has_acpi_companion(dev)){
-               if(fwnode_property_read_u32(dev_fwnode(dev),"clock-frequency", (u32 *)&(tacho->freq) ) <0)
-                       tacho->freq = 50000000;
-       }
+		if(fwnode_property_read_u32(dev_fwnode(dev),"clock-frequency", (u32 *)&(tacho->freq) ) <0)
+			tacho->freq = 50000000;
+    }
 
 	tacho->irq = platform_get_irq(pdev, 0);
 	if (tacho->irq < 0) {
