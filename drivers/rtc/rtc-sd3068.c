@@ -95,7 +95,7 @@ static int sd3068_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sd3068 *sd3068 = i2c_get_clientdata(client);
 	int ret;
-	printk("sd3068 read\n");
+	pr_debug("sd3068 read\n");
 
 	ret = regmap_bulk_read(sd3068->regmap, SD3068_REG_SC, rtc_data,
 					NUM_TIME_REGS);
@@ -134,7 +134,7 @@ static int sd3068_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sd3068 *sd3068 = i2c_get_clientdata(client);
 	int ret;
-	printk("sd3068 set\n");
+	pr_debug("sd3068 set\n");
 
 	rtc_data[SD3068_REG_SC] = bin2bcd(tm->tm_sec);
 	rtc_data[SD3068_REG_MN] = bin2bcd(tm->tm_min);
@@ -178,7 +178,8 @@ static int sd3068_probe(struct i2c_client *client,
 {
 	int ret;
 	struct sd3068 *sd3068;
-	printk("probed\n");
+	unsigned char rtc_data[NUM_TIME_REGS] = {0};
+	pr_debug("probed\n");
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
@@ -202,6 +203,13 @@ static int sd3068_probe(struct i2c_client *client,
 	sd3068->rtc->ops = &sd3068_rtc_ops;
 	sd3068->rtc->range_min = RTC_TIMESTAMP_BEGIN_2000;
 	sd3068->rtc->range_max = RTC_TIMESTAMP_END_2099;
+
+	ret = regmap_bulk_read(sd3068->regmap, SD3068_REG_SC, rtc_data,
+					NUM_TIME_REGS);
+	if (ret < 0) {
+		dev_info(&client->dev, "can not read time data when probe\n");
+		return ret;
+	}
 
 	ret = rtc_register_device(sd3068->rtc);
 	if (ret)
