@@ -95,7 +95,6 @@ static void phytium_mci_update_external_clk(struct phytium_mci_host *host, u32 u
 	writel(uhs_reg_value, host->base + MCI_UHS_REG_EXT);
 	while (!(readl(host->base + MCI_CCLK_RDY) & 0x1))
 		cpu_relax();
-
 }
 
 static void phytium_mci_prepare_data(struct phytium_mci_host *host,
@@ -695,6 +694,9 @@ phytium_mci_start_data(struct phytium_mci_host *host, struct mmc_request *mrq,
 	wmb(); /* drain writebuffer */
 	writel(rawcmd, host->base + MCI_CMD);
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	mod_timer(&host->timeout_timer,
+		jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 }
 
 static void phytium_mci_track_cmd_data(struct phytium_mci_host *host,
@@ -711,6 +713,7 @@ static void phytium_mci_request_done(struct phytium_mci_host *host, struct mmc_r
 	unsigned long flags;
 
 	spin_lock_irqsave(&host->lock, flags);
+	del_timer(&host->timeout_timer);
 	host->mrq = NULL;
 	if (host->cmd)
 		host->cmd = NULL;
@@ -804,6 +807,9 @@ static void phytium_mci_start_command(struct phytium_mci_host *host,
 	writel(cmd->arg, host->base + MCI_CMDARG);
 	writel(rawcmd, host->base + MCI_CMD);
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	mod_timer(&host->timeout_timer,
+		jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 }
 
 static void
@@ -1070,6 +1076,26 @@ static void hotplug_timer_func(struct timer_list *t)
 	} else {
 		cancel_delayed_work(&host->mmc->detect);
 		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+	}
+}
+
+static void phytium_mci_request_timeout(struct timer_list *t)
+{
+	struct phytium_mci_host *host = from_timer(host, t, timeout_timer);
+
+	dev_err(host->dev, "request timeout\n");
+	if (host->mrq) {
+		dev_err(host->dev, "aborting mrq=%p cmd=%d\n",
+				host->mrq, host->mrq->cmd->opcode);
+		if (host->cmd) {
+			dev_err(host->dev, "aborting cmd=%d\n", host->cmd->opcode);
+			phytium_mci_cmd_done(host, MCI_RAW_INTS_RTO, host->mrq, host->cmd);
+		} else if (host->data) {
+			dev_err(host->dev, "abort data: cmd%d; %d blocks\n",
+					host->mrq->cmd->opcode, host->data->blocks);
+			phytium_mci_data_xfer_done(host, MCI_RAW_INTS_RTO, host->mrq,
+					host->data);
+		}
 	}
 }
 
@@ -1468,6 +1494,7 @@ int phytium_mci_common_probe(struct phytium_mci_host *host)
 	dma_set_coherent_mask(dev, DMA_BIT_MASK(64));
 
 	timer_setup(&host->hotplug_timer, hotplug_timer_func, 0);
+	timer_setup(&host->timeout_timer, phytium_mci_request_timeout, 0);
 
 	mmc->f_min = MCI_F_MIN;
 	if (!mmc->f_max)

@@ -270,6 +270,9 @@
 /* ADMA2 64-bit DMA descriptor size */
 #define ADMA2_64_DESC_SZ	32
 
+/* mmc request timeout 5000ms */
+#define MMC_REQ_TIMEOUT_MS 5000
+
 /* Each descriptor can transfer up to 4KB of data in chained mode */
 /*ADMA2 64-bit descriptor.*/
 struct phytium_adma2_64_desc {
@@ -325,6 +328,7 @@ struct phytium_mci_host {
 	u32 *sg_virt_addr;
 	enum adtc_t adtc_type;      /* 0:common adtc cmd; 1:block r/w adtc cmd;*/
 	struct timer_list hotplug_timer;
+	struct timer_list timeout_timer;
 	struct delayed_work req_timeout;
 	int irq;		    /* host interrupt */
 	u32 current_rca;    /*the current rca value*/
