@@ -1146,6 +1146,8 @@ static int azx_first_init(struct azx *chip)
 
 	synchronize_irq(bus->irq);
 
+	spin_lock_init(&bus->reg_lock);
+
 	if (!dma_set_mask(i2sdev, DMA_BIT_MASK(dma_bits))) {
 		err = dma_set_coherent_mask(i2sdev, DMA_BIT_MASK(dma_bits));
 	} else {
