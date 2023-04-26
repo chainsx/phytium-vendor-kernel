@@ -3134,7 +3134,10 @@ static void macb_set_rx_mode(struct net_device *dev)
 
 static int macb_open(struct net_device *dev)
 {
-	size_t bufsz = dev->mtu + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN;
+	/* adjust bufsz to be at least the size of a standard frame,
+	 * to fix rx error when set small size mtu.
+	 */
+	size_t bufsz = (dev->mtu < ETH_DATA_LEN ? ETH_DATA_LEN : dev->mtu) + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN;
 	struct macb *bp = netdev_priv(dev);
 	struct macb_queue *queue;
 	unsigned int q;
