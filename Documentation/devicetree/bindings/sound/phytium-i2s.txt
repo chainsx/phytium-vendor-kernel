@@ -1,0 +1,24 @@
+* Phytium I2S controller
+
+The I2S bus (Inter-IC sound bus) is a serial link for digital
+audio data transfer between devices in the system.
+
+Required properties:
+
+- compatible: should be "phytium,i2s"
+- reg: It contains two register region:
+       - first is for physical base address and length of I2S controller.
+       - second is for physical base address and length of DMA_BDL controller.
+- interrupts: should contain the DMA_BDL interrupt.
+- clocks: phandle to clock provider with the clock number in the second cell
+- dai-name: it will set dai's name used in driver.
+
+Example for Pe220x I2S controller:
+
+i2s@28009000 {
+	compatible = "phytium,i2s";
+	reg = <0x0 0x28009000 0x0 0x1000>, <0x0 0x28005000 0x0 0x1000>;
+	interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&sysclk_600mhz>;
+	dai-name = "phytium-i2s-lsd";
+};

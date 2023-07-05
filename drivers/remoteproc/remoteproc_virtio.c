@@ -26,6 +26,7 @@
 #include <linux/err.h>
 #include <linux/kref.h>
 #include <linux/slab.h>
+#include <asm/cacheflush.h>
 
 #include "remoteproc_internal.h"
 
@@ -177,6 +178,7 @@ static void rproc_virtio_set_status(struct virtio_device *vdev, u8 status)
 	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
 
 	rsc->status = status;
+	__flush_dcache_area(rvdev->rproc->table_ptr, rvdev->rproc->table_sz);
 	dev_dbg(&vdev->dev, "status: %d\n", status);
 }
 

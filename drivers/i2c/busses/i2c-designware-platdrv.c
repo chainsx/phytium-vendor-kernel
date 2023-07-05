@@ -151,6 +151,7 @@ static const struct acpi_device_id dw_i2c_acpi_match[] = {
 	{ "APMC0D0F", 0 },
 	{ "HISI02A1", 0 },
 	{ "HISI02A2", 0 },
+	{ "PHYT0003", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, dw_i2c_acpi_match);
@@ -203,8 +204,8 @@ static void dw_i2c_set_fifo_size(struct dw_i2c_dev *dev, int id)
 	 * the depth could be from 2 to 256 from HW spec.
 	 */
 	param = i2c_dw_read_comp_param(dev);
-	tx_fifo_depth = ((param >> 16) & 0xff) + 1;
-	rx_fifo_depth = ((param >> 8)  & 0xff) + 1;
+	tx_fifo_depth = 8;//((param >> 16) & 0xff) + 1;
+	rx_fifo_depth = 8;//((param >> 8)  & 0xff) + 1;
 	if (!dev->tx_fifo_depth) {
 		dev->tx_fifo_depth = tx_fifo_depth;
 		dev->rx_fifo_depth = rx_fifo_depth;
@@ -289,7 +290,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	else if (acpi_speed || t->bus_freq_hz)
 		t->bus_freq_hz = max(t->bus_freq_hz, acpi_speed);
 	else
-		t->bus_freq_hz = 400000;
+		t->bus_freq_hz = 100000;
 
 	if (has_acpi_companion(&pdev->dev))
 		dw_i2c_acpi_configure(pdev);
@@ -322,7 +323,6 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 
 		dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
 		clk_khz = dev->get_clk_rate_khz(dev);
-
 		if (!dev->sda_hold_time && t->sda_hold_ns)
 			dev->sda_hold_time =
 				div_u64(clk_khz * t->sda_hold_ns + 500000, 1000000);

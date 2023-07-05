@@ -3450,6 +3450,10 @@
 		force	Enable ASPM even on devices that claim not to support it.
 			WARNING: Forcing ASPM on may cause system lockups.
 
+	pcie_hp=	[PCIE] PCI Express Hotplug driver options:
+		nomsi	Do not use MSI for PCI Express Native Hotplug (this
+			makes all PCIe ports use INTx for hotplug services).
+
 	pcie_ports=	[PCIE] PCIe port services handling:
 		native	Use native PCIe services (PME, AER, DPC, PCIe hotplug)
 			even if the platform doesn't give the OS permission to

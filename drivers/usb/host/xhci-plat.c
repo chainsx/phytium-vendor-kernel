@@ -65,12 +65,14 @@ static int xhci_priv_resume_quirk(struct usb_hcd *hcd)
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
+	struct xhci_plat_priv *priv = xhci_to_priv(xhci);
+
 	/*
 	 * As of now platform drivers don't provide MSI support so we ensure
 	 * here that the generic code does not try to make a pci_dev from our
 	 * dev struct in order to setup MSI
 	 */
-	xhci->quirks |= XHCI_PLAT;
+	xhci->quirks |= XHCI_PLAT | priv->quirks;
 }
 
 /* called during probe() after chip reset completes */
@@ -111,6 +113,10 @@ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
 	.resume_quirk = xhci_rcar_resume_quirk,
 };
 
+static const struct xhci_plat_priv xhci_plat_phytium_pe220x = {
+	.quirks = XHCI_RESET_ON_RESUME,
+};
+
 static const struct of_device_id usb_xhci_of_match[] = {
 	{
 		.compatible = "generic-xhci",
@@ -143,6 +149,9 @@ static const struct of_device_id usb_xhci_of_match[] = {
 	}, {
 		.compatible = "renesas,rcar-gen3-xhci",
 		.data = &xhci_plat_renesas_rcar_gen3,
+	}, {
+		.compatible = "phytium,pe220x-xhci",
+		.data = &xhci_plat_phytium_pe220x,
 	},
 	{},
 };
@@ -252,7 +261,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	}
 
 	xhci = hcd_to_xhci(hcd);
-	priv_match = of_device_get_match_data(&pdev->dev);
+	if (has_acpi_companion(&pdev->dev))
+		priv_match = acpi_device_get_match_data(&pdev->dev);
+	else
+		priv_match = of_device_get_match_data(&pdev->dev);
 	if (priv_match) {
 		struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
 
@@ -438,6 +450,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
 static const struct acpi_device_id usb_xhci_acpi_match[] = {
 	/* XHCI-compliant USB Controller */
 	{ "PNP0D10", },
+	{ "PHYT0039", (kernel_ulong_t)&xhci_plat_phytium_pe220x },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);

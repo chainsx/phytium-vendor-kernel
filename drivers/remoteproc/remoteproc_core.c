@@ -42,6 +42,7 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
+#include <asm/cacheflush.h>
 
 #include "remoteproc_internal.h"
 
@@ -257,6 +258,9 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	rsc = (void *)rproc->table_ptr + rvdev->rsc_offset;
 	rsc->vring[i].da = dma;
 	rsc->vring[i].notifyid = notifyid;
+
+	__flush_dcache_area(rproc->table_ptr, rproc->table_sz);
+
 	return 0;
 }
 
@@ -1777,6 +1781,27 @@ void rproc_report_crash(struct rproc *rproc, enum rproc_crash_type type)
 	schedule_work(&rproc->crash_handler);
 }
 EXPORT_SYMBOL(rproc_report_crash);
+
+void (*rproc_handle_arch_irq)(void);
+
+int rproc_set_handle_irq(void (handle_irq)(void))
+{
+	if (rproc_handle_arch_irq)
+		return -EBUSY;
+
+	rproc_handle_arch_irq = handle_irq;
+	return 0;
+}
+EXPORT_SYMBOL(rproc_set_handle_irq);
+
+void rproc_handle_ipi(int ipinr)
+{
+	if (rproc_handle_arch_irq)
+		rproc_handle_arch_irq();
+
+	return ;
+}
+EXPORT_SYMBOL(rproc_handle_ipi);
 
 static int __init remoteproc_init(void)
 {
