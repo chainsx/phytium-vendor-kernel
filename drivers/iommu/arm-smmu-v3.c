@@ -201,6 +201,13 @@
 #define Q_BASE_ADDR_MASK		GENMASK_ULL(51, 5)
 #define Q_BASE_LOG2SIZE			GENMASK(4, 0)
 
+/* Ensure DMA allocations are naturally aligned */
+#ifdef CONFIG_CMA_ALIGNMENT
+#define Q_MAX_SZ_SHIFT			(PAGE_SHIFT + CONFIG_CMA_ALIGNMENT)
+#else
+#define Q_MAX_SZ_SHIFT			(PAGE_SHIFT + MAX_ORDER - 1)
+#endif
+
 /*
  * Stream table.
  *
@@ -298,8 +305,9 @@
 					FIELD_GET(ARM64_TCR_##fld, tcr))
 
 /* Command queue */
-#define CMDQ_ENT_DWORDS			2
-#define CMDQ_MAX_SZ_SHIFT		8
+#define CMDQ_ENT_SZ_SHIFT		4
+#define CMDQ_ENT_DWORDS			((1 << CMDQ_ENT_SZ_SHIFT) >> 3)
+#define CMDQ_MAX_SZ_SHIFT		(Q_MAX_SZ_SHIFT - CMDQ_ENT_SZ_SHIFT)
 
 #define CMDQ_CONS_ERR			GENMASK(30, 24)
 #define CMDQ_ERR_CERROR_NONE_IDX	0
@@ -338,14 +346,16 @@
 #define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(51, 2)
 
 /* Event queue */
-#define EVTQ_ENT_DWORDS			4
-#define EVTQ_MAX_SZ_SHIFT		7
+#define EVTQ_ENT_SZ_SHIFT		5
+#define EVTQ_ENT_DWORDS			((1 << EVTQ_ENT_SZ_SHIFT) >> 3)
+#define EVTQ_MAX_SZ_SHIFT		(Q_MAX_SZ_SHIFT - EVTQ_ENT_SZ_SHIFT)
 
 #define EVTQ_0_ID			GENMASK_ULL(7, 0)
 
 /* PRI queue */
-#define PRIQ_ENT_DWORDS			2
-#define PRIQ_MAX_SZ_SHIFT		8
+#define PRIQ_ENT_SZ_SHIFT		4
+#define PRIQ_ENT_DWORDS			((1 << PRIQ_ENT_SZ_SHIFT) >> 3)
+#define PRIQ_MAX_SZ_SHIFT		(Q_MAX_SZ_SHIFT - PRIQ_ENT_SZ_SHIFT)
 
 #define PRIQ_0_SID			GENMASK_ULL(31, 0)
 #define PRIQ_0_SSID			GENMASK_ULL(51, 32)
@@ -568,6 +578,7 @@ struct arm_smmu_device {
 	int				gerr_irq;
 	int				combined_irq;
 	u32				sync_nr;
+	u8				prev_cmd_opcode;
 
 	unsigned long			ias; /* IPA */
 	unsigned long			oas; /* PA */
@@ -594,6 +605,7 @@ struct arm_smmu_device {
 
 	/* IOMMU core code handle */
 	struct iommu_device		iommu;
+	bool                            bypass;
 };
 
 /* SMMU private data for each master */
@@ -789,7 +801,7 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
 /* High-level queue accessors */
 static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
 {
-	memset(cmd, 0, CMDQ_ENT_DWORDS << 3);
+	memset(cmd, 0, 1 << CMDQ_ENT_SZ_SHIFT);
 	cmd[0] |= FIELD_PREP(CMDQ_0_OP, ent->opcode);
 
 	switch (ent->opcode) {
@@ -918,6 +930,8 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
 	struct arm_smmu_queue *q = &smmu->cmdq.q;
 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
 
+	smmu->prev_cmd_opcode = FIELD_GET(CMDQ_0_OP, cmd[0]);
+
 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
 		if (queue_poll_cons(q, false, wfe))
 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
@@ -970,9 +984,16 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
 	};
 
 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-	ent.sync.msidata = ++smmu->sync_nr;
-	arm_smmu_cmdq_build_cmd(cmd, &ent);
-	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+
+	/* Piggy-back on the previous command if it's a SYNC */
+	if (smmu->prev_cmd_opcode == CMDQ_OP_CMD_SYNC) {
+		ent.sync.msidata = smmu->sync_nr;
+	} else {
+		ent.sync.msidata = ++smmu->sync_nr;
+		arm_smmu_cmdq_build_cmd(cmd, &ent);
+		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+	}
+
 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
 
 	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
@@ -2036,15 +2057,30 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 				   struct arm_smmu_queue *q,
 				   unsigned long prod_off,
 				   unsigned long cons_off,
-				   size_t dwords)
+				   size_t dwords, const char *name)
 {
-	size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
+	size_t qsz;
 
-	q->base = dmam_alloc_coherent(smmu->dev, qsz, &q->base_dma, GFP_KERNEL);
+	do {
+		qsz = ((1 << q->max_n_shift) * dwords) << 3;
+		q->base = dmam_alloc_coherent(smmu->dev, qsz, &q->base_dma,
+					      GFP_KERNEL);
+		if (q->base || qsz < PAGE_SIZE)
+			break;
+
+		q->max_n_shift--;
+	} while (1);
+
 	if (!q->base) {
-		dev_err(smmu->dev, "failed to allocate queue (0x%zx bytes)\n",
-			qsz);
+		dev_err(smmu->dev,
+			"failed to allocate queue (0x%zx bytes) for %s\n",
+			qsz, name);
 		return -ENOMEM;
+	}
+
+	if (!WARN_ON(q->base_dma & (qsz - 1))) {
+		dev_info(smmu->dev, "allocated %u entries for %s\n",
+			 1 << q->max_n_shift, name);
 	}
 
 	q->prod_reg	= arm_smmu_page1_fixup(prod_off, smmu);
@@ -2066,13 +2102,15 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
 	/* cmdq */
 	spin_lock_init(&smmu->cmdq.lock);
 	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, ARM_SMMU_CMDQ_PROD,
-				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS);
+				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS,
+				      "cmdq");
 	if (ret)
 		return ret;
 
 	/* evtq */
 	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
-				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
+				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS,
+				      "evtq");
 	if (ret)
 		return ret;
 
@@ -2081,7 +2119,8 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
 		return 0;
 
 	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
-				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS,
+				       "priq");
 }
 
 static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
@@ -2253,6 +2292,13 @@ static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
 	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
 	doorbell &= MSI_CFG0_ADDR_MASK;
 
+#ifdef CONFIG_PM_SLEEP
+	/* Saves the msg (base addr of msi irq) and restores it during resume */
+	desc->msg.address_lo = msg->address_lo;
+	desc->msg.address_hi = msg->address_hi;
+	desc->msg.data = msg->data;
+#endif
+
 	writeq_relaxed(doorbell, smmu->base + cfg[0]);
 	writel_relaxed(msg->data, smmu->base + cfg[1]);
 	writel_relaxed(ARM_SMMU_MEMATTR_DEVICE_nGnRE, smmu->base + cfg[2]);
@@ -2308,11 +2354,51 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
 	devm_add_action(dev, arm_smmu_free_msis, dev);
 }
 
-static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
+#ifdef CONFIG_PM_SLEEP
+static void arm_smmu_resume_msis(struct arm_smmu_device *smmu)
+{
+       struct msi_desc *desc;
+       struct device *dev = smmu->dev;
+
+       for_each_msi_entry(desc, dev) {
+               switch (desc->platform.msi_index) {
+               case EVTQ_MSI_INDEX:
+               case GERROR_MSI_INDEX:
+               case PRIQ_MSI_INDEX: {
+                       phys_addr_t *cfg = arm_smmu_msi_cfg[desc->platform.msi_index];
+                       struct msi_msg *msg = &desc->msg;
+                       phys_addr_t doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
+
+                       doorbell &= MSI_CFG0_ADDR_MASK;
+                       writeq_relaxed(doorbell, smmu->base + cfg[0]);
+                       writel_relaxed(msg->data, smmu->base + cfg[1]);
+                       writel_relaxed(ARM_SMMU_MEMATTR_DEVICE_nGnRE,
+                                       smmu->base + cfg[2]);
+                       break;
+               }
+               default:
+                       continue;
+
+               }
+       }
+}
+#else
+static void arm_smmu_resume_msis(struct arm_smmu_device *smmu)
+{
+}
+#endif
+
+static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu, bool resume)
 {
 	int irq, ret;
 
-	arm_smmu_setup_msis(smmu);
+	if (!resume)
+		arm_smmu_setup_msis(smmu);
+	else {
+		/* The irq doesn't need to be re-requested during resume */
+		arm_smmu_resume_msis(smmu);
+		return;
+	}
 
 	/* Request interrupt lines */
 	irq = smmu->evtq.q.irq;
@@ -2354,7 +2440,7 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
 	}
 }
 
-static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu, bool resume)
 {
 	int ret, irq;
 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
@@ -2381,7 +2467,7 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 		if (ret < 0)
 			dev_warn(smmu->dev, "failed to enable combined irq\n");
 	} else
-		arm_smmu_setup_unique_irqs(smmu);
+		arm_smmu_setup_unique_irqs(smmu, resume);
 
 	if (smmu->features & ARM_SMMU_FEAT_PRI)
 		irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
@@ -2406,7 +2492,7 @@ static int arm_smmu_device_disable(struct arm_smmu_device *smmu)
 	return ret;
 }
 
-static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool resume)
 {
 	int ret;
 	u32 reg, enables;
@@ -2504,7 +2590,7 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
 		}
 	}
 
-	ret = arm_smmu_setup_irqs(smmu);
+	ret = arm_smmu_setup_irqs(smmu, resume);
 	if (ret) {
 		dev_err(smmu->dev, "failed to setup irqs\n");
 		return ret;
@@ -2514,7 +2600,7 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
 		enables &= ~(CR0_EVTQEN | CR0_PRIQEN);
 
 	/* Enable the SMMU interface, or ensure bypass */
-	if (!bypass || disable_bypass) {
+	if (!smmu->bypass || disable_bypass) {
 		enables |= CR0_SMMUEN;
 	} else {
 		ret = arm_smmu_update_gbpa(smmu, 0, GBPA_ABORT);
@@ -2635,7 +2721,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		return -ENXIO;
 	}
 
-	/* Queue sizes, capped at 4k */
+	/* Queue sizes, capped to ensure natural alignment */
 	smmu->cmdq.q.max_n_shift = min_t(u32, CMDQ_MAX_SZ_SHIFT,
 					 FIELD_GET(IDR1_CMDQS, reg));
 	if (!smmu->cmdq.q.max_n_shift) {
@@ -2796,6 +2882,26 @@ static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
 		return SZ_128K;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int arm_smmu_suspend(struct device *dev)
+{
+	/*
+	 * The smmu is powered off and related registers are automatically
+	 * cleared when suspend. No need to do anything.
+	 */
+	return 0;
+}
+
+static int arm_smmu_resume(struct device *dev)
+{
+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+
+	arm_smmu_device_reset(smmu, true);
+
+	return 0;
+}
+#endif
+
 static int arm_smmu_device_probe(struct platform_device *pdev)
 {
 	int irq, ret;
@@ -2803,7 +2909,6 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	resource_size_t ioaddr;
 	struct arm_smmu_device *smmu;
 	struct device *dev = &pdev->dev;
-	bool bypass;
 
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
@@ -2821,7 +2926,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	}
 
 	/* Set bypass mode according to firmware probing result */
-	bypass = !!ret;
+	smmu->bypass = !!ret;
 
 	/* Base address */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2867,7 +2972,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, smmu);
 
 	/* Reset the device */
-	ret = arm_smmu_device_reset(smmu, bypass);
+	ret = arm_smmu_device_reset(smmu, false);
 	if (ret)
 		return ret;
 
@@ -2929,10 +3034,21 @@ static const struct of_device_id arm_smmu_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 
+#ifdef CONFIG_PM_SLEEP
+static const struct dev_pm_ops arm_smmu_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(arm_smmu_suspend,
+	arm_smmu_resume)
+};
+#define ARM_SMMU_PM_OPS                (&arm_smmu_pm_ops)
+#else
+#define ARM_SMMU_PM_OPS                NULL
+#endif
+
 static struct platform_driver arm_smmu_driver = {
 	.driver	= {
 		.name		= "arm-smmu-v3",
 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
+		.pm             = ARM_SMMU_PM_OPS,
 	},
 	.probe	= arm_smmu_device_probe,
 	.remove	= arm_smmu_device_remove,
