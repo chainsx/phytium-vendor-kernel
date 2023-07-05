@@ -1,0 +1,10 @@
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-demo-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-demo-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000s-demo-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-miniitx-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-miniitx-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-vpx-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-edu-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-come-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-power-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-hanwei-board.dtb

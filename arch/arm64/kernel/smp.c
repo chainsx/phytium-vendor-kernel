@@ -59,6 +59,7 @@
 #include <asm/tlbflush.h>
 #include <asm/ptrace.h>
 #include <asm/virt.h>
+#include <linux/remoteproc.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
@@ -82,7 +83,8 @@ enum ipi_msg_type {
 	IPI_CPU_CRASH_STOP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
-	IPI_WAKEUP
+	IPI_WAKEUP,
+	IPI_RPROC = 9,
 };
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -914,6 +916,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		break;
 #endif
 
+	case IPI_RPROC:
+		irq_enter();
+		rproc_handle_ipi(ipinr);
+		irq_exit();
+		break;
 	default:
 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
 		break;

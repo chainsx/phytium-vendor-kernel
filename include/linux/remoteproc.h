@@ -558,6 +558,9 @@ void rproc_shutdown(struct rproc *rproc);
 void rproc_report_crash(struct rproc *rproc, enum rproc_crash_type type);
 int rproc_coredump_add_segment(struct rproc *rproc, dma_addr_t da, size_t size);
 
+void rproc_handle_ipi(int ipinr);
+int rproc_set_handle_irq(void (handle_irq)(void));
+
 static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)
 {
 	return container_of(vdev, struct rproc_vdev, vdev);

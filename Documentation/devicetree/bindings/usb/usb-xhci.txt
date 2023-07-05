@@ -18,6 +18,7 @@ Required properties:
     - "renesas,rcar-gen2-xhci" for a generic R-Car Gen2 or RZ/G1 compatible
       device
     - "renesas,rcar-gen3-xhci" for a generic R-Car Gen3 compatible device
+    - "phytium,pe220x-xhci" for Phytium Pe220x SoC
     - "xhci-platform" (deprecated)
 
     When compatible with the generic version, nodes must list the
