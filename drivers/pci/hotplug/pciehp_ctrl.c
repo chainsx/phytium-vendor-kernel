@@ -226,6 +226,11 @@ void pciehp_handle_presence_or_link_change(struct controller *ctrl, u32 events)
 {
 	int present, link_active;
 
+#ifdef CONFIG_ARCH_PHYTIUM
+	struct pci_dev *pdev = ctrl->pcie->port;
+	u16 slot_ctrl_val;
+#endif
+
 	/*
 	 * If the slot is on and presence or link has changed, turn it off.
 	 * Even if it's occupied again, we cannot assume the card is the same.
@@ -244,6 +249,21 @@ void pciehp_handle_presence_or_link_change(struct controller *ctrl, u32 events)
 		if (events & PCI_EXP_SLTSTA_PDC)
 			ctrl_info(ctrl, "Slot(%s): Card not present\n",
 				  slot_name(ctrl));
+#ifdef CONFIG_ARCH_PHYTIUM
+		if ((ctrl->buses > 0) && (ctrl->slot_ctrl > 0)) {
+			pci_write_config_dword(pdev, PCI_PRIMARY_BUS, ctrl->buses);
+			slot_ctrl_val = ctrl->slot_ctrl_t | PCI_EXP_SLTCTL_ABPE |
+					PCI_EXP_SLTCTL_PFDE | PCI_EXP_SLTCTL_MRLSCE |
+					PCI_EXP_SLTCTL_PDCE | PCI_EXP_SLTCTL_CCIE |
+					PCI_EXP_SLTCTL_HPIE | PCI_EXP_SLTCTL_ATTN_IND_BLINK |
+					PCI_EXP_SLTCTL_PWR_IND_ON |
+					PCI_EXP_SLTCTL_DLLSCE;
+			slot_ctrl_val &= ~PCI_EXP_SLTCTL_PWR_OFF;
+			pcie_capability_write_word(pdev, PCI_EXP_SLTCTL, slot_ctrl_val);
+			ctrl_info(ctrl, "Ctrl buses=0x%x, slot_ctrl=0x%x\n",
+				  ctrl->buses, slot_ctrl_val);
+		}
+#endif
 		pciehp_disable_slot(ctrl, SURPRISE_REMOVAL);
 		break;
 	default:
