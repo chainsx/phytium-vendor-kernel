@@ -4091,6 +4091,17 @@ static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
 	struct macb_platform_data *pdata;
 	int err;
 
+	/* clk get not support ACPI */
+	if (has_acpi_companion(&pdev->dev)) {
+		dev_info(&pdev->dev, "ACPI skip get macb clk\n");
+		*pclk = NULL;
+		*hclk = NULL;
+		*tx_clk = NULL;
+		*rx_clk = NULL;
+		*tsu_clk = NULL;
+		return 0;
+	}
+
 	pdata = dev_get_platdata(&pdev->dev);
 	if (pdata) {
 		*pclk = pdata->pclk;
@@ -5476,6 +5487,7 @@ static struct platform_driver macb_driver = {
 	.driver		= {
 		.name		= "macb",
 		.of_match_table	= of_match_ptr(macb_dt_ids),
+		.acpi_match_table = ACPI_PTR(macb_acpi_ids),
 		.pm	= &macb_pm_ops,
 	},
 };
