@@ -108,9 +108,10 @@ int i2c_dw_set_reg_access(struct dw_i2c_dev *dev)
 		/* Configure register access mode 16bit */
 		dev->flags |= ACCESS_16BIT;
 	} else if (reg != DW_IC_COMP_TYPE_VALUE) {
-		dev_err(dev->dev,
-			"Unknown Synopsys component type: 0x%08x\n", reg);
-		return -ENODEV;
+		//dev_err(dev->dev,
+			//"Unknown Synopsys component type: 0x%08x\n", reg);
+		//return -ENODEV;
+		return 0;
 	}
 
 	return 0;

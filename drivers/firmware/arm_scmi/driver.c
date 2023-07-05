@@ -84,6 +84,10 @@ struct scmi_desc {
 	int max_msg_size;
 };
 
+#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
+static bool scmi_force_polling;
+#endif
+
 /**
  * struct scmi_chan_info - Structure representing a SCMI channel informfation
  *
@@ -272,6 +276,15 @@ static void scmi_tx_prepare(struct mbox_client *cl, void *m)
 	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
 	struct scmi_shared_mem __iomem *mem = cinfo->payload;
 
+#ifdef CONFIG_ARCH_PHYTIUM
+	/* callee not set cahnnel free when init, caller set it */
+	static int is_init = 0;
+	if(unlikely(is_init == 0)) {
+		iowrite32(0x1, &mem->channel_status);
+		is_init = 1;
+	}
+#endif
+
 	/*
 	 * Ideally channel must be free by now unless OS timeout last
 	 * request and platform continued to process the same, wait
@@ -380,6 +393,14 @@ static bool scmi_xfer_done_no_timeout(const struct scmi_chan_info *cinfo,
 	return scmi_xfer_poll_done(cinfo, xfer) || ktime_after(__cur, stop);
 }
 
+#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
+static int __init scmi_set_force_polling(char *str)
+{
+	return kstrtobool(str, &scmi_force_polling);
+}
+early_param("scmi.force_polling", scmi_set_force_polling);
+#endif
+
 /**
  * scmi_do_xfer() - Do one transfer
  *
@@ -401,6 +422,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	cinfo = idr_find(&info->tx_idr, xfer->hdr.protocol_id);
 	if (unlikely(!cinfo))
 		return -EINVAL;
+
+#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
+	if (scmi_force_polling)
+		xfer->hdr.poll_completion = true;
+#endif
 
 	ret = mbox_send_message(cinfo->chan, xfer);
 	if (ret < 0) {

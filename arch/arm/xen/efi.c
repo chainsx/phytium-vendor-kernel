@@ -22,7 +22,7 @@
 /* Set XEN EFI runtime services function pointers. Other fields of struct efi,
  * e.g. efi.systab, will be set like normal EFI.
  */
-void __init xen_efi_runtime_setup(void)
+void xen_efi_runtime_setup(void)
 {
 	efi.get_time                 = xen_efi_get_time;
 	efi.set_time                 = xen_efi_set_time;

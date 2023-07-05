@@ -176,3 +176,5 @@ obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
 obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
 obj-$(CONFIG_RTC_DRV_ZYNQMP)	+= rtc-zynqmp.o
 obj-$(CONFIG_RTC_DRV_GOLDFISH)	+= rtc-goldfish.o
+obj-$(CONFIG_RTC_DRV_SD3068)	+= rtc-sd3068.o
+obj-$(CONFIG_RTC_DRV_SD3078)	+= rtc-sd3078.o
