@@ -3848,6 +3848,10 @@
 		force	Enable ASPM even on devices that claim not to support it.
 			WARNING: Forcing ASPM on may cause system lockups.
 
+	pcie_hp=	[PCIE] PCI Express Hotplug driver options:
+		nomsi	Do not use MSI for PCI Express Native Hotplug (this
+			makes all PCIe ports use INTx for hotplug services).
+
 	pcie_ports=	[PCIE] PCIe port services handling:
 		native	Use native PCIe services (PME, AER, DPC, PCIe hotplug)
 			even if the platform doesn't give the OS permission to
@@ -4140,6 +4144,10 @@
 			per-CPU rcuc kthreads.  Defaults to a non-zero
 			value, meaning that RCU_SOFTIRQ is used by default.
 			Specify rcutree.use_softirq=0 to use rcuc kthreads.
+
+			But note that CONFIG_PREEMPT_RT=y kernels disable
+			this kernel boot parameter, forcibly setting it
+			to zero.
 
 	rcutree.rcu_fanout_exact= [KNL]
 			Disable autobalancing of the rcu_node combining
@@ -4518,6 +4526,13 @@
 			rcu_end_inkernel_boot() has been invoked), use
 			only normal grace-period primitives.  No effect
 			on CONFIG_TINY_RCU kernels.
+
+			But note that CONFIG_PREEMPT_RT=y kernels enables
+			this kernel boot parameter, forcibly setting
+			it to the value one, that is, converting any
+			post-boot attempt at an expedited RCU grace
+			period to instead use normal non-expedited
+			grace-period processing.
 
 	rcupdate.rcu_task_ipi_delay= [KNL]
 			Set time in jiffies during which RCU tasks will
