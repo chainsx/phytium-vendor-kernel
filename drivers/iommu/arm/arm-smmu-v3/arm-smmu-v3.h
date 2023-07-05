@@ -636,6 +636,7 @@ struct arm_smmu_device {
 
 	/* IOMMU core code handle */
 	struct iommu_device		iommu;
+	bool                            bypass;
 };
 
 /* SMMU private data for each master */
