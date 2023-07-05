@@ -63,6 +63,7 @@ struct psci_operations psci_ops = {
 	.conduit = PSCI_CONDUIT_NONE,
 	.smccc_version = SMCCC_VERSION_1_0,
 };
+EXPORT_SYMBOL(psci_ops);
 
 enum arm_smccc_conduit arm_smccc_1_1_get_conduit(void)
 {

@@ -83,6 +83,7 @@
 #define GEM_USRIO		0x000c /* User IO */
 #define GEM_DMACFG		0x0010 /* DMA Configuration */
 #define GEM_JML			0x0048 /* Jumbo Max Length */
+#define GEM_HS_MAC_CONFIG	0x0050 /* GEM high speed config */
 #define GEM_HRB			0x0080 /* Hash Bottom */
 #define GEM_HRT			0x0084 /* Hash Top */
 #define GEM_SA1B		0x0088 /* Specific1 Bottom */
@@ -167,6 +168,8 @@
 #define GEM_DCFG7		0x0298 /* Design Config 7 */
 #define GEM_DCFG8		0x029C /* Design Config 8 */
 #define GEM_DCFG10		0x02A4 /* Design Config 10 */
+#define GEM_USX_CONTROL		0x0A80 /* High speed PCS control register */
+#define GEM_USX_STATUS		0x0A88 /* High speed PCS status register */
 
 #define GEM_TXBDCTRL	0x04cc /* TX Buffer Descriptor control register */
 #define GEM_RXBDCTRL	0x04d0 /* RX Buffer Descriptor control register */
@@ -201,6 +204,31 @@
 #define GEM_IER(hw_q)		(0x0600 + ((hw_q) << 2))
 #define GEM_IDR(hw_q)		(0x0620 + ((hw_q) << 2))
 #define GEM_IMR(hw_q)		(0x0640 + ((hw_q) << 2))
+
+#define GEM_SRC_SEL_LN          0x1C04
+#define GEM_DIV_SEL0_LN         0x1C08
+#define GEM_DIV_SEL1_LN         0x1C0C
+#define GEM_PMA_XCVR_POWER_STATE  0x1C10
+#define GEM_SPEED_MODE          0x1C14
+#define GEM_MII_SELECT          0x1C18
+#define GEM_SEL_MII_ON_RGMII    0x1C1C
+#define GEM_TX_CLK_SEL0         0x1C20
+#define GEM_TX_CLK_SEL1         0x1C24
+#define GEM_TX_CLK_SEL2         0x1C28
+#define GEM_TX_CLK_SEL3         0x1C2C
+#define GEM_RX_CLK_SEL0         0x1C30
+#define GEM_RX_CLK_SEL1         0x1C34
+#define GEM_CLK_250M_DIV10_DIV100_SEL 0x1C38
+#define GEM_TX_CLK_SEL5         0x1C3C
+#define GEM_TX_CLK_SEL6         0x1C40
+#define GEM_RX_CLK_SEL4         0x1C44
+#define GEM_RX_CLK_SEL5         0x1C48
+#define GEM_TX_CLK_SEL3_0       0x1C70
+#define GEM_TX_CLK_SEL4_0         0x1C74
+#define GEM_RX_CLK_SEL3_0         0x1C78
+#define GEM_RX_CLK_SEL4_0         0x1C7C
+#define GEM_RGMII_TX_CLK_SEL0     0x1C80
+#define GEM_RGMII_TX_CLK_SEL1     0x1C84
 
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET		0 /* reserved */
@@ -458,6 +486,10 @@
 #define MACB_REV_OFFSET				0
 #define MACB_REV_SIZE				16
 
+/* Bitfield in HS_MAC_CONFIG */
+#define GEM_HS_MAC_SPEED_OFFSET			0
+#define GEM_HS_MAC_SPEED_SIZE			3
+
 /* Bitfields in DCFG1. */
 #define GEM_IRQCOR_OFFSET			23
 #define GEM_IRQCOR_SIZE				1
@@ -497,13 +529,27 @@
 #define GEM_RXBD_RDBUFF_OFFSET			8
 #define GEM_RXBD_RDBUFF_SIZE			4
 
+/* Bitfields in USX_CONTROL. */
+#define GEM_USX_CTRL_SPEED_OFFSET		14
+#define GEM_USX_CTRL_SPEED_SIZE			3
+#define GEM_SERDES_RATE_OFFSET			12
+#define GEM_SERDES_RATE_SIZE			2
+#define GEM_RX_SCR_BYPASS_OFFSET		9
+#define GEM_RX_SCR_BYPASS_SIZE			1
+#define GEM_TX_SCR_BYPASS_OFFSET		8
+#define GEM_TX_SCR_BYPASS_SIZE			1
+#define GEM_TX_EN_OFFSET			1
+#define GEM_TX_EN_SIZE				1
+#define GEM_SIGNAL_OK_OFFSET			0
+#define GEM_SIGNAL_OK_SIZE			1
+
 /* Bitfields in TISUBN */
 #define GEM_SUBNSINCR_OFFSET			0
 #define GEM_SUBNSINCRL_OFFSET			24
-#define GEM_SUBNSINCRL_SIZE			8
+#define GEM_SUBNSINCRL_SIZE			    8
 #define GEM_SUBNSINCRH_OFFSET			0
-#define GEM_SUBNSINCRH_SIZE			16
-#define GEM_SUBNSINCR_SIZE			24
+#define GEM_SUBNSINCRH_SIZE			    16
+#define GEM_SUBNSINCR_SIZE			    24
 
 /* Bitfields in TI */
 #define GEM_NSINCR_OFFSET			0
@@ -631,6 +677,8 @@
 #define GEM_CLK_DIV48				3
 #define GEM_CLK_DIV64				4
 #define GEM_CLK_DIV96				5
+#define GEM_CLK_DIV128              6
+#define GEM_CLK_DIV224              7
 
 /* Constants for MAN register */
 #define MACB_MAN_SOF				1
@@ -652,6 +700,7 @@
 #define MACB_CAPS_GIGABIT_MODE_AVAILABLE	0x20000000
 #define MACB_CAPS_SG_DISABLED			0x40000000
 #define MACB_CAPS_MACB_IS_GEM			0x80000000
+#define MACB_CAPS_SEL_CLK_HW			0x00001000
 
 /* LSO settings */
 #define MACB_LSO_UFO_ENABLE			0x01
@@ -1087,7 +1136,7 @@ struct macb_config {
 	unsigned int		dma_burst_length;
 	int	(*clk_init)(struct platform_device *pdev, struct clk **pclk,
 			    struct clk **hclk, struct clk **tx_clk,
-			    struct clk **rx_clk);
+			    struct clk **rx_clk, struct clk **tsu_clk);
 	int	(*init)(struct platform_device *pdev);
 	int	jumbo_max_len;
 };
@@ -1167,7 +1216,9 @@ struct macb {
 	struct clk		*hclk;
 	struct clk		*tx_clk;
 	struct clk		*rx_clk;
+	struct clk		*tsu_clk;
 	struct net_device	*dev;
+	struct ncsi_dev		*ndev;
 	union {
 		struct macb_stats	macb;
 		struct gem_stats	gem;
@@ -1180,6 +1231,8 @@ struct macb {
 	int 			link;
 	int 			speed;
 	int 			duplex;
+	int			use_ncsi;
+	int 		force_phy_mode;
 
 	u32			caps;
 	unsigned int		dma_burst_length;

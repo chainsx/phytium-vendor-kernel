@@ -66,8 +66,6 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 					scl_falling_time,
 					0);	/* No offset */
 	}
-	dev_dbg(dev->dev, "Standard Mode HCNT:LCNT = %d:%d\n",
-		dev->ss_hcnt, dev->ss_lcnt);
 
 	/*
 	 * Set SCL timing parameters for fast mode or fast mode plus. Only
@@ -103,8 +101,6 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 					scl_falling_time,
 					0);	/* No offset */
 	}
-	dev_dbg(dev->dev, "Fast Mode%s HCNT:LCNT = %d:%d\n",
-		fp_str, dev->fs_hcnt, dev->fs_lcnt);
 
 	/* Check is high speed possible and fall back to fast mode if not */
 	if ((dev->master_cfg & DW_IC_CON_SPEED_MASK) ==
