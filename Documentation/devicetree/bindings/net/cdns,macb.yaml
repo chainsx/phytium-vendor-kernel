@@ -46,6 +46,11 @@ properties:
               - cdns,at91sam9260-macb # Atmel at91sam9 SoCs.
           - const: cdns,macb          # Generic
 
+      - items:
+          - enum:
+              - cdns,phytium-gem     # Phytium SoC
+          - const: cdns,gmac          # Generic
+
       - enum:
           - atmel,sama5d29-gem        # GEM XL IP (10/100) on Atmel sama5d29 SoCs
           - atmel,sama5d2-gem         # GEM IP (10/100) on Atmel sama5d2 SoCs
