@@ -7,3 +7,10 @@ config SND_SOC_PHYTIUM_I2S
 	 Phytium I2S device . The device supports 2 channels each
 	 for play and record.
 
+config SND_PMDK_ES8388
+	tristate "Phytium machine support with ES8388"
+	depends on I2C && SND_SOC_PHYTIUM_I2S
+	select SND_SOC_ES8388
+	help
+	 Say Y if you want to add Phytium machine support for
+	 ES8388 codecs.
