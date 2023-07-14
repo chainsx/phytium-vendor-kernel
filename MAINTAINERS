@@ -2546,6 +2546,7 @@ F:	Documentation/devicetree/bindings/mmc/phytium,mci.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:	Documentation/devicetree/bindings/mtd/phytium,nfc.yaml
 F:	Documentation/devicetree/bindings/net/can/phytium,can.yaml
+F:	Documentation/devicetree/bindings/pci/phytium,pd2008-pcie-ep.yaml
 F:	Documentation/devicetree/bindings/pwm/phytium,pwm.yaml
 F:	Documentation/devicetree/bindings/rng/phytium,rng.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,hda.yaml
