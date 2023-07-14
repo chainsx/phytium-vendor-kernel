@@ -2556,6 +2556,7 @@ F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/gpio/gpio-phytium-sgpio.c
+F:	drivers/hwmon/tacho-phytium.c
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/iio/adc/phytium-adc.c
