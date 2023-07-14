@@ -2542,6 +2542,7 @@ F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/input/serio/phytium-ps2.c
+F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/net/can/phytium/*
 F:	drivers/spi/spi-phytium*
