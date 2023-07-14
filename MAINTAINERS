@@ -2531,6 +2531,7 @@ M:     Chen Baozi <chenbaozi@phytium.com.cn>
 S:     Maintained
 W:     https://www.phytium.com.cn
 F:     Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
+F:     Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:     arch/arm64/boot/dts/phytium/*
 F:     drivers/gpio/gpio-phytium*
 
