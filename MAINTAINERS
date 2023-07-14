@@ -2532,6 +2532,7 @@ S:	Maintained
 W:	https://www.phytium.com.cn
 F:	Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
 F:	Documentation/devicetree/bindings/i2c/phytium,i2c.yaml
+F:	Documentation/devicetree/bindings/iio/adc/phytium,adc.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,mci.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:	Documentation/devicetree/bindings/mtd/phytium,nfc.yaml
