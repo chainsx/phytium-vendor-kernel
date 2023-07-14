@@ -2573,6 +2573,7 @@ F:	drivers/irqchip/irq-phytium-ixic.c
 F:	drivers/mailbox/phytium_mailbox.c
 F:	drivers/media/platform/phytium-jpeg/phytium_jpeg*
 F:	drivers/mfd/phytium_px210_i2s_lsd.c
+F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
