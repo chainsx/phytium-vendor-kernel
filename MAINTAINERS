@@ -2534,6 +2534,7 @@ F:     Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
 F:     Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:     arch/arm64/boot/dts/phytium/*
 F:     drivers/gpio/gpio-phytium*
+F:     drivers/mmc/host/phytium-sdci.*
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
 R:	cros-qcom-dts-watchers@chromium.org

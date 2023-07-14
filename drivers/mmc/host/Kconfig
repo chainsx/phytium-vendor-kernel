@@ -1069,3 +1069,9 @@ config MMC_LITEX
 	  module will be called litex_mmc.
 
 	  If unsure, say N.
+
+config MMC_PHYTIUM_SDCI
+        tristate "Phytium SD Host Controller support"
+        depends on ARM64
+        help
+            This selects support for the Phytium SD Host Controller
