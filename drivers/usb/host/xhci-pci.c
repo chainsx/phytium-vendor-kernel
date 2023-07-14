@@ -477,8 +477,10 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 		xhci->quirks |= XHCI_RESET_ON_RESUME;
 
 	if (pdev->vendor == PCI_VENDOR_ID_PHYTIUM ||
-	    pdev->device == PCI_DEVICE_ID_PHYTIUM_XHCI)
+	    pdev->device == PCI_DEVICE_ID_PHYTIUM_XHCI) {
 		xhci->quirks |= XHCI_RESET_ON_RESUME;
+		xhci->quirks |= XHCI_SLOWDOWN_QUIRK;
+	}
 
 	/* See https://bugzilla.kernel.org/show_bug.cgi?id=79511 */
 	if (pdev->vendor == PCI_VENDOR_ID_VIA &&
