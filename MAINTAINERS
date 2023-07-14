@@ -2564,6 +2564,7 @@ F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/iio/adc/phytium-adc.c
 F:	drivers/input/keyboard/phytium-keypad.c
 F:	drivers/input/serio/phytium-ps2.c
+F:	drivers/irqchip/irq-phytium-ixic.c
 F:	drivers/mailbox/phytium_mailbox.c
 F:	drivers/media/platform/phytium-jpeg/phytium_jpeg*
 F:	drivers/mmc/host/phytium-mci*
