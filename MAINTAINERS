@@ -2538,6 +2538,7 @@ F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/spi/spi-phytium*
+F:	drivers/spi/spi-phytium-qspi.c
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
 R:	cros-qcom-dts-watchers@chromium.org
