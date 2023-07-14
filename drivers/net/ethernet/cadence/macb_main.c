@@ -1891,10 +1891,11 @@ static irqreturn_t gem_wol_interrupt(int irq, void *dev_id)
 
 static irqreturn_t macb_interrupt(int irq, void *dev_id)
 {
-	struct macb_queue *queue = dev_id;
+	struct macb_queue *qq, *queue = dev_id;
 	struct macb *bp = queue->bp;
 	struct net_device *dev = bp->dev;
 	u32 status, ctrl;
+	unsigned int q;
 
 	status = queue_readl(queue, ISR);
 
@@ -1941,11 +1942,13 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
 							 MACB_BIT(TXUBR));
 
 			if (status & MACB_BIT(TXUBR)) {
-				queue->txubr_pending = true;
-				wmb(); // ensure softirq can see update
-			}
-
-			if (napi_schedule_prep(&queue->napi_tx)) {
+				for (q = 0, qq = bp->queues; q < bp->num_queues; q++, qq++) {
+					qq->txubr_pending = true;
+					wmb(); // ensure softirq can see update
+					if (napi_schedule_prep(&qq->napi_tx))
+						__napi_schedule(&qq->napi_tx);
+				}
+			} else if (napi_schedule_prep(&queue->napi_tx)) {
 				netdev_vdbg(bp->dev, "scheduling TX softirq\n");
 				__napi_schedule(&queue->napi_tx);
 			}
