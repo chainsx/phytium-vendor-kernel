@@ -2545,6 +2545,7 @@ F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/input/serio/phytium-ps2.c
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
+F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/net/can/phytium/*
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-qspi.c
