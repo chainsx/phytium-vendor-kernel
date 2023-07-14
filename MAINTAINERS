@@ -2584,6 +2584,7 @@ F:	drivers/tty/serial/phytium-uart.c
 F:	drivers/usb/phytium/*
 F:	drivers/w1/masters/phytium_w1.c
 F:	sound/pci/hda/hda_phytium.*
+F:	sound/soc/phytium/*
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
 R:	cros-qcom-dts-watchers@chromium.org

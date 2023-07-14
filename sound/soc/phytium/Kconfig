@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+config SND_SOC_PHYTIUM_I2S
+	bool "Phytium I2S Device Driver"
+	depends on ARCH_PHYTIUM
+	help
+	 Say Y or M if you want to add support for I2S driver for
+	 Phytium I2S device . The device supports 2 channels each
+	 for play and record.
+
