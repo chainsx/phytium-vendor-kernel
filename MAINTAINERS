@@ -2531,6 +2531,7 @@ M:	Chen Baozi <chenbaozi@phytium.com.cn>
 S:	Maintained
 W:	https://www.phytium.com.cn
 F:	Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
+F:	Documentation/devicetree/bindings/gpio/phytium,sgpio.yaml
 F:	Documentation/devicetree/bindings/hwlock/phytium,hwspinlock.yaml
 F:	Documentation/devicetree/bindings/i2c/phytium,i2c.yaml
 F:	Documentation/devicetree/bindings/media/phytium,jpeg.yaml
