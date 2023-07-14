@@ -6,6 +6,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/crc32.h>
@@ -4898,6 +4899,54 @@ err_out_phy_exit:
 	return ret;
 }
 
+#define PHYTIUM_PCLK_RATE 250000000
+#define PHYTIUM_HCLK_RATE 48000000
+
+static int phytium_clk_init(struct platform_device *pdev, struct clk **pclk,
+			    struct clk **hclk, struct clk **tx_clk,
+			    struct clk **rx_clk, struct clk **tsu_clk)
+{
+	struct macb_platform_data plat_data;
+	int err = 0;
+
+	if (has_acpi_companion(&pdev->dev)) {
+		/* set up macb platform data */
+		memset(&plat_data, 0, sizeof(plat_data));
+
+		/* initialize clocks */
+		plat_data.pclk = clk_register_fixed_rate(&pdev->dev, "pclk", NULL, 0,
+							 PHYTIUM_PCLK_RATE);
+		if (IS_ERR(plat_data.pclk)) {
+			err = PTR_ERR(plat_data.pclk);
+			goto err_pclk_register;
+		}
+
+		plat_data.hclk = clk_register_fixed_rate(&pdev->dev, "hclk", NULL, 0,
+							 PHYTIUM_HCLK_RATE);
+		if (IS_ERR(plat_data.hclk)) {
+			err = PTR_ERR(plat_data.hclk);
+			goto err_hclk_register;
+		}
+
+		err = platform_device_add_data(pdev, &plat_data, sizeof(plat_data));
+		if (err)
+			goto err_plat_dev_register;
+	}
+
+	err = macb_clk_init(pdev, pclk, hclk, tx_clk, rx_clk, tsu_clk);
+
+	return 0;
+
+err_plat_dev_register:
+	clk_unregister(plat_data.hclk);
+
+err_hclk_register:
+	clk_unregister(plat_data.pclk);
+
+err_pclk_register:
+	return err;
+}
+
 static const struct macb_usrio_config sama7g5_usrio = {
 	.mii = 0,
 	.rmii = 1,
@@ -5053,7 +5102,7 @@ static const struct macb_config phytium_config = {
 		MACB_CAPS_GEM_HAS_PTP |	MACB_CAPS_BD_RD_PREFETCH |
 		MACB_CAPS_SEL_CLK_HW,
 	.dma_burst_length = 16,
-	.clk_init = macb_clk_init,
+	.clk_init = phytium_clk_init,
 	.init = macb_init,
 	.jumbo_max_len = 10240,
 	.usrio = &macb_default_usrio,
@@ -5088,6 +5137,17 @@ static const struct of_device_id macb_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, macb_dt_ids);
 #endif /* CONFIG_OF */
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id macb_acpi_ids[] = {
+	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_config },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(acpi, macb_acpi_ids);
+#else
+#define macb_acpi_ids NULL
+#endif
+
 static const struct macb_config default_gem_config = {
 	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
 		MACB_CAPS_JUMBO |
@@ -5117,6 +5177,26 @@ static void gem_ncsi_handler(struct ncsi_dev *nd)
 
 	netdev_dbg(nd->dev, "NCSI interface %s\n",
 		   nd->link_up ? "up" : "down");
+}
+
+static int macb_get_phy_mode(struct platform_device *pdev, phy_interface_t *interface)
+{
+	const char *pm;
+	int err, i;
+
+	err = device_property_read_string(&pdev->dev, "phy-mode", &pm);
+	if (err < 0)
+		err = device_property_read_string(&pdev->dev, "phy-connection-type", &pm);
+	if (err < 0)
+		return err;
+
+	for (i = 0; i < PHY_INTERFACE_MODE_MAX; i++)
+		if (!strcasecmp(pm, phy_modes(i))) {
+			*interface = i;
+			return 0;
+		}
+
+	return -ENODEV;
 }
 
 static int macb_probe(struct platform_device *pdev)
@@ -5149,6 +5229,15 @@ static int macb_probe(struct platform_device *pdev)
 		match = of_match_node(macb_dt_ids, np);
 		if (match && match->data) {
 			macb_config = match->data;
+			clk_init = macb_config->clk_init;
+			init = macb_config->init;
+		}
+	} else if (has_acpi_companion(&pdev->dev)) {
+		const struct acpi_device_id *match;
+
+		match = acpi_match_device(macb_acpi_ids, &pdev->dev);
+		if (match && match->driver_data) {
+			macb_config = (void *)match->driver_data;
 			clk_init = macb_config->clk_init;
 			init = macb_config->init;
 		}
@@ -5208,7 +5297,7 @@ static int macb_probe(struct platform_device *pdev)
 		bp->max_tx_length = GEM_MAX_TX_LEN;
 
 	bp->wol = 0;
-	if (of_property_read_bool(np, "magic-packet"))
+	if (device_property_read_bool(&pdev->dev, "magic-packet"))
 		bp->wol |= MACB_WOL_HAS_MAGIC_PACKET;
 	device_set_wakeup_capable(&pdev->dev, bp->wol & MACB_WOL_HAS_MAGIC_PACKET);
 
@@ -5281,7 +5370,7 @@ static int macb_probe(struct platform_device *pdev)
 	else if (err)
 		macb_get_hwaddr(bp);
 
-	err = of_get_phy_mode(np, &interface);
+	err = macb_get_phy_mode(pdev, &interface);
 	if (err)
 		/* not found in DT, MII by default */
 		bp->phy_interface = PHY_INTERFACE_MODE_MII;
@@ -5601,6 +5690,7 @@ static struct platform_driver macb_driver = {
 	.driver		= {
 		.name		= "macb",
 		.of_match_table	= of_match_ptr(macb_dt_ids),
+		.acpi_match_table = macb_acpi_ids,
 		.pm	= &macb_pm_ops,
 	},
 };
