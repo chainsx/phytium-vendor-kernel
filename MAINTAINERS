@@ -2551,6 +2551,7 @@ F:	drivers/net/can/phytium/*
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-qspi.c
 F:	drivers/tty/serial/phytium-uart.c
+F:	drivers/w1/masters/phytium_w1.c
 F:	sound/pci/hda/hda_phytium.*
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
