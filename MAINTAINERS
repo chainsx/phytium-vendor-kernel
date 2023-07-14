@@ -2542,6 +2542,7 @@ F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/net/can/phytium/*
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-qspi.c
+F:	sound/pci/hda/hda_phytium.*
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
 R:	cros-qcom-dts-watchers@chromium.org
