@@ -2533,6 +2533,7 @@ W:	https://www.phytium.com.cn
 F:	Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:	Documentation/devicetree/bindings/net/can/phytium,can.yaml
+F:	Documentation/devicetree/bindings/sound/phytium,hda.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
 F:	arch/arm64/boot/dts/phytium/*
