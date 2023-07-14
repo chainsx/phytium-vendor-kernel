@@ -2552,6 +2552,7 @@ F:	Documentation/devicetree/bindings/rng/phytium,rng.yaml
 F:	Documentation/devicetree/bindings/sound/phytium,hda.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
+F:	Documentation/devicetree/bindings/usb/phytium,usb2.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/char/hw_random/phytium-rng.c
