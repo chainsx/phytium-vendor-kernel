@@ -22,3 +22,11 @@ config SND_PMDK_ES8336
 	help
 	 Say Y if you want to add Phytium machine support for
 	 ES8336 codecs.
+
+config SND_PMDK_DP
+	tristate "Phytium machine support with DP"
+	depends on I2C && SND_SOC_PHYTIUM_I2S
+	select SND_SOC_HDMI_CODEC
+	help
+	 Say Y if you want to add Phytium machine support for
+	 Displayport.
