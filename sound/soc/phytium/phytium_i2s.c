@@ -8,6 +8,7 @@
  *    Copyright (C) 2010 ST Microelectronics
  */
 
+#include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/init.h>
@@ -694,7 +695,7 @@ int snd_i2s_stream_set_params(struct i2s_stream *azx_dev,
 	return 0;
 }
 
-int snd_i2s_stream_setup(struct i2s_stream *azx_dev)
+int snd_i2s_stream_setup(struct i2s_stream *azx_dev, int pcie, u32 paddr)
 {
 	struct snd_pcm_runtime *runtime;
 
@@ -709,7 +710,10 @@ int snd_i2s_stream_setup(struct i2s_stream *azx_dev)
 	if (azx_dev->direction == SNDRV_PCM_STREAM_PLAYBACK) {
 		i2s_write_reg(azx_dev->sd_addr, DMA_BDLPL(0), (u32)azx_dev->bdl.addr);
 		i2s_write_reg(azx_dev->sd_addr, DMA_BDLPU(0), upper_32_bits(azx_dev->bdl.addr));
-		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(0), 0x1c8);
+		if (pcie)
+			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(0), 0x1c8);
+		else
+			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(0), paddr + 0x1c8);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_CBL(0), azx_dev->bufsize);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_LVI(0), azx_dev->frags - 1);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DSIZE(0), 0x2);//0x2
@@ -717,7 +721,10 @@ int snd_i2s_stream_setup(struct i2s_stream *azx_dev)
 	} else {
 		i2s_write_reg(azx_dev->sd_addr, DMA_BDLPL(1), (u32)azx_dev->bdl.addr);
 		i2s_write_reg(azx_dev->sd_addr, DMA_BDLPU(1), upper_32_bits(azx_dev->bdl.addr));
-		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(1), 0x1c0);
+		if (pcie)
+			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(1), 0x1c0);
+		else
+			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DEV_ADDR(1), paddr + 0x1c0);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_CBL(1), azx_dev->bufsize);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_LVI(1), azx_dev->frags - 1);
 		i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_DSIZE(1), 0x8);//0x8
@@ -765,7 +772,7 @@ static int phytium_pcm_prepare(struct snd_soc_component *component,
 	if (err < 0)
 		goto unlock;
 
-	snd_i2s_stream_setup(azx_stream(azx_dev));
+	snd_i2s_stream_setup(azx_stream(azx_dev), dev->pcie, dev->paddr);
 
  unlock:
 	if (!err)
@@ -859,9 +866,13 @@ static int phytium_pcm_trigger(struct snd_soc_component *component,
 void snd_i2s_stream_cleanup(struct i2s_stream *azx_dev)
 {
 	int cnt = 10;
+	u32 mask;
 
 	if (azx_dev->sd_addr) {
 		if (azx_dev->direction == SNDRV_PCM_STREAM_PLAYBACK) {
+			mask = i2s_read_reg(azx_dev->sd_addr, DMA_MASK_INT);
+			mask &= ~BIT(0);
+			i2s_write_reg(azx_dev->sd_addr, DMA_MASK_INT, mask);
 			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_CTL(0), 0);
 			while (cnt--) {
 				if (i2s_read_reg(azx_dev->sd_addr, DMA_CHALX_CTL(0)) == 0)
@@ -872,6 +883,9 @@ void snd_i2s_stream_cleanup(struct i2s_stream *azx_dev)
 			i2s_write_reg(azx_dev->sd_addr, DMA_BDLPL(0), 0);
 			i2s_write_reg(azx_dev->sd_addr, DMA_BDLPU(0), 0);
 		} else {
+			mask = i2s_read_reg(azx_dev->sd_addr, DMA_MASK_INT);
+			mask &= ~BIT(1);
+			i2s_write_reg(azx_dev->sd_addr, DMA_MASK_INT, mask);
 			i2s_write_reg(azx_dev->sd_addr, DMA_CHALX_CTL(1), 0);
 			while (cnt--) {
 				if (i2s_read_reg(azx_dev->sd_addr, DMA_CHALX_CTL(1)) == 0)
@@ -1265,9 +1279,11 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct pdata_px210_mfd *pdata;
 	struct snd_soc_dai_driver *dai_drv;
+	struct clk *clk;
 	int err, ret;
 	int card_num = 1;
 	bool schedule_probe;
+	struct fwnode_handle *np;
 
 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
 	if (!i2s)
@@ -1279,6 +1295,7 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 	memcpy(dai_drv, &phytium_i2s_dai, sizeof(phytium_i2s_dai));
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	i2s->paddr = res->start;
 	i2s->regs = devm_ioremap_resource(&pdev->dev, res);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
@@ -1308,10 +1325,32 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, i2s);
 
 	pdata = dev_get_platdata(&pdev->dev);
-	dai_drv->name = pdata->name;
 	i2s->dev = &pdev->dev;
-	i2s->pdev = pdata->dev;
-	i2s->clk_base = pdata->clk_base;
+	if (pdata) {
+		dai_drv->name = pdata->name;
+		i2s->pdev = pdata->dev;
+		i2s->clk_base = pdata->clk_base;
+		i2s->pcie = 1;
+	} else if (pdev->dev.of_node) {
+		device_property_read_string(&pdev->dev, "dai-name", &dai_drv->name);
+		i2s->pdev = &pdev->dev;
+		clk = devm_clk_get(&pdev->dev, NULL);
+		i2s->clk_base = clk_get_rate(clk);
+	} else if (has_acpi_companion(&pdev->dev)) {
+		np = dev_fwnode(&(pdev->dev));
+		ret = fwnode_property_read_string(np, "dai-name", &dai_drv->name);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "missing dai-name property from acpi\n");
+			goto failed_get_dai_name;
+		}
+
+		i2s->pdev = &pdev->dev;
+		ret = fwnode_property_read_u32(np, "i2s_clk", &i2s->clk_base);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "missing i2s_clk property from acpi\n");
+			goto failed_get_dai_name;
+		}
+	}
 
 	ret = devm_snd_soc_register_component(&pdev->dev, &phytium_i2s_component,
 					      dai_drv, 1);
@@ -1325,6 +1364,9 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 		complete_all(&i2s->probe_wait);
 
 	return 0;
+
+failed_get_dai_name:
+	return ret;
 }
 
 static int phytium_i2s_remove(struct platform_device *pdev)
@@ -1333,11 +1375,28 @@ static int phytium_i2s_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id phytium_i2s_of_match[] = {
+	{ .compatible = "phytium,i2s", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, phytium_i2s_of_match);
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_i2s_acpi_match[] = {
+	{ "PHYT0016", 0 },
+	{ }
+};
+#else
+#define phytium_i2s_acpi_match NULL
+#endif
+
 static struct platform_driver phytium_i2s_driver = {
 	.probe	= phytium_i2s_probe,
 	.remove	= phytium_i2s_remove,
 	.driver	= {
 		.name = "phytium-i2s",
+		.of_match_table = of_match_ptr(phytium_i2s_of_match),
+		.acpi_match_table = phytium_i2s_acpi_match,
 	},
 };
 

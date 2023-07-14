@@ -278,6 +278,7 @@ struct i2s_phytium {
 	struct snd_pcm_substream *substream;
 	struct device *dev;
 	struct device *pdev;
+	u32 paddr;
 	void __iomem *regs;
 	void __iomem *regs_db;
 	int irq_id;
@@ -290,6 +291,7 @@ struct i2s_phytium {
 	struct work_struct probe_work;
 
 	/* extra flags */
+	unsigned int pcie:1;
 	unsigned int irq_pending_warned:1;
 	unsigned int probe_continued:1;
 	unsigned int i2s_dp:1;

@@ -200,6 +200,12 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 	return devm_snd_soc_register_card(&pdev->dev, card);
 }
 
+static const struct of_device_id pmdk_sound_of_match[] = {
+	{ .compatible = "phytium,pmdk-dp",},
+	{ }
+};
+MODULE_DEVICE_TABLE(of, pmdk_sound_of_match);
+
 static const struct acpi_device_id pmdk_sound_acpi_match[] = {
 	{ "PHYT8006", 0},
 	{ }
@@ -211,6 +217,7 @@ static struct platform_driver pmdk_sound_driver = {
 	.driver = {
 		.name = "pmdk_dp",
 		.acpi_match_table = pmdk_sound_acpi_match,
+		.of_match_table = pmdk_sound_of_match,
 #ifdef CONFIG_PM
 		.pm = &snd_soc_pm_ops,
 #endif
