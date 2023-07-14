@@ -38,6 +38,7 @@
 #include <linux/ptp_classify.h>
 #include <linux/reset.h>
 #include <linux/firmware/xlnx-zynqmp.h>
+#include <net/ncsi.h>
 #include "macb.h"
 
 /* This structure is only used for MACB on SiFive FU540 devices */
@@ -2956,13 +2957,24 @@ static int macb_open(struct net_device *dev)
 
 	macb_init_hw(bp);
 
-	err = phy_power_on(bp->sgmii_phy);
-	if (err)
-		goto reset_hw;
+	if (bp->use_ncsi) {
+		/* If using NC-SI, set our carrier on and start the stack */
+		netif_carrier_on(dev);
 
-	err = macb_phylink_connect(bp);
-	if (err)
-		goto phy_off;
+		/* Start the NCSI device */
+		err = ncsi_start_dev(bp->ndev);
+		if (err) {
+			netdev_err(dev, "NCSI start dev failed (error %d)\n", err);
+		}
+	} else {
+		err = phy_power_on(bp->sgmii_phy);
+		if (err)
+			goto reset_hw;
+
+		err = macb_phylink_connect(bp);
+		if (err)
+			goto phy_off;
+	}
 
 	netif_tx_start_all_queues(dev);
 
@@ -3004,6 +3016,9 @@ static int macb_close(struct net_device *dev)
 	phylink_disconnect_phy(bp->phylink);
 
 	phy_power_off(bp->sgmii_phy);
+
+	if (bp->use_ncsi)
+		ncsi_stop_dev(bp->ndev);
 
 	spin_lock_irqsave(&bp->lock, flags);
 	macb_reset_hw(bp);
@@ -3887,6 +3902,8 @@ static const struct net_device_ops macb_netdev_ops = {
 #endif
 	.ndo_set_features	= macb_set_features,
 	.ndo_features_check	= macb_features_check,
+	.ndo_vlan_rx_add_vid	= ncsi_vlan_rx_add_vid,
+	.ndo_vlan_rx_kill_vid	= ncsi_vlan_rx_kill_vid,
 };
 
 /* Configure peripheral capabilities according to device tree
@@ -4154,6 +4171,12 @@ static int macb_init(struct platform_device *pdev)
 	/* Checksum offload is only available on gem with packet buffer */
 	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE))
 		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
+
+	if (bp->use_ncsi) {
+		dev->hw_features &= ~(NETIF_F_HW_CSUM | NETIF_F_RXCSUM);
+		dev->hw_features |= NETIF_F_HW_VLAN_CTAG_FILTER;
+	}
+
 	if (bp->caps & MACB_CAPS_SG_DISABLED)
 		dev->hw_features &= ~NETIF_F_SG;
 	dev->features = dev->hw_features;
@@ -4943,6 +4966,26 @@ static const struct macb_config default_gem_config = {
 	.jumbo_max_len = 10240,
 };
 
+static void macb_destroy_mdio(struct net_device *dev)
+{
+	struct macb *bp = netdev_priv(dev);
+
+	if (!bp->mii_bus)
+		return;
+
+	mdiobus_unregister(bp->mii_bus);
+	mdiobus_free(bp->mii_bus);
+}
+
+static void gem_ncsi_handler(struct ncsi_dev *nd)
+{
+	if (unlikely(nd->state != ncsi_dev_state_functional))
+		return;
+
+	netdev_dbg(nd->dev, "NCSI interface %s\n",
+		   nd->link_up ? "up" : "down");
+}
+
 static int macb_probe(struct platform_device *pdev)
 {
 	const struct macb_config *macb_config = &default_gem_config;
@@ -5117,9 +5160,27 @@ static int macb_probe(struct platform_device *pdev)
 	if (err)
 		goto err_out_free_netdev;
 
-	err = macb_mii_init(bp);
-	if (err)
-		goto err_out_phy_exit;
+	if (device_property_read_bool(&pdev->dev, "use-ncsi")) {
+		if (!IS_ENABLED(CONFIG_NET_NCSI)) {
+			dev_err(&pdev->dev, "NCSI stack not enabled\n");
+			err = -EINVAL;
+			goto err_out_free_netdev;
+		}
+
+		dev_notice(&pdev->dev, "Using NCSI interface\n");
+		bp->use_ncsi = 1;
+		bp->ndev = ncsi_register_dev(dev, gem_ncsi_handler);
+		if (!bp->ndev) {
+			err = -EINVAL;
+			goto err_out_free_netdev;
+		}
+	} else {
+		err = macb_mii_init(bp);
+		if (err)
+			goto err_out_phy_exit;
+
+		bp->use_ncsi = 0;
+	}
 
 	netif_carrier_off(dev);
 
@@ -5141,8 +5202,9 @@ static int macb_probe(struct platform_device *pdev)
 	return 0;
 
 err_out_unregister_mdio:
-	mdiobus_unregister(bp->mii_bus);
-	mdiobus_free(bp->mii_bus);
+	if (bp->ndev)
+		ncsi_unregister_dev(bp->ndev);
+	macb_destroy_mdio(dev);
 
 err_out_phy_exit:
 	phy_exit(bp->sgmii_phy);
@@ -5169,8 +5231,9 @@ static int macb_remove(struct platform_device *pdev)
 	if (dev) {
 		bp = netdev_priv(dev);
 		phy_exit(bp->sgmii_phy);
-		mdiobus_unregister(bp->mii_bus);
-		mdiobus_free(bp->mii_bus);
+		macb_destroy_mdio(dev);
+		if (bp->ndev)
+			ncsi_unregister_dev(bp->ndev);
 
 		unregister_netdev(dev);
 		tasklet_kill(&bp->hresp_err_tasklet);
