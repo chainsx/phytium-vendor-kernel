@@ -220,6 +220,31 @@
 #define GEM_IDR(hw_q)		(0x0620 + ((hw_q) << 2))
 #define GEM_IMR(hw_q)		(0x0640 + ((hw_q) << 2))
 
+#define GEM_SRC_SEL_LN			0x1C04
+#define GEM_DIV_SEL0_LN			0x1C08
+#define GEM_DIV_SEL1_LN			0x1C0C
+#define GEM_PMA_XCVR_POWER_STATE	0x1C10
+#define GEM_SPEED_MODE			0x1C14
+#define GEM_MII_SELECT			0x1C18
+#define GEM_SEL_MII_ON_RGMII		0x1C1C
+#define GEM_TX_CLK_SEL0			0x1C20
+#define GEM_TX_CLK_SEL1			0x1C24
+#define GEM_TX_CLK_SEL2			0x1C28
+#define GEM_TX_CLK_SEL3			0x1C2C
+#define GEM_RX_CLK_SEL0			0x1C30
+#define GEM_RX_CLK_SEL1			0x1C34
+#define GEM_CLK_250M_DIV10_DIV100_SEL	0x1C38
+#define GEM_TX_CLK_SEL5			0x1C3C
+#define GEM_TX_CLK_SEL6			0x1C40
+#define GEM_RX_CLK_SEL4			0x1C44
+#define GEM_RX_CLK_SEL5			0x1C48
+#define GEM_TX_CLK_SEL3_0		0x1C70
+#define GEM_TX_CLK_SEL4_0		0x1C74
+#define GEM_RX_CLK_SEL3_0		0x1C78
+#define GEM_RX_CLK_SEL4_0		0x1C7C
+#define GEM_RGMII_TX_CLK_SEL0		0x1C80
+#define GEM_RGMII_TX_CLK_SEL1		0x1C84
+
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET		0 /* reserved */
 #define MACB_LB_SIZE		1
@@ -741,6 +766,7 @@
 #define MACB_CAPS_GIGABIT_MODE_AVAILABLE	0x20000000
 #define MACB_CAPS_SG_DISABLED			0x40000000
 #define MACB_CAPS_MACB_IS_GEM			0x80000000
+#define MACB_CAPS_SEL_CLK_HW			0x00001000
 
 /* LSO settings */
 #define MACB_LSO_UFO_ENABLE			0x01

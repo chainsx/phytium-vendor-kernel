@@ -88,6 +88,10 @@ struct sifive_fu540_macb_mgmt {
 #define MACB_WOL_HAS_MAGIC_PACKET	(0x1 << 0)
 #define MACB_WOL_ENABLED		(0x1 << 1)
 
+#define HS_SPEED_100M			0
+#define HS_SPEED_1000M			1
+#define HS_SPEED_2500M			2
+#define HS_SPEED_5000M			3
 #define HS_SPEED_10000M			4
 #define MACB_SERDES_RATE_10G		1
 
@@ -563,6 +567,120 @@ static void macb_set_tx_clk(struct macb *bp, int speed)
 		netdev_err(bp->dev, "adjusting tx_clk failed.\n");
 }
 
+static int phytium_gem_sel_clk(struct macb *bp, int spd)
+{
+	int speed = 0;
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
+		if (spd == SPEED_10000) {
+			gem_writel(bp, SRC_SEL_LN, 0x1);
+			gem_writel(bp, DIV_SEL0_LN, 0x4);
+			gem_writel(bp, DIV_SEL1_LN, 0x1);
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
+			speed = HS_SPEED_10000M;
+		}
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		if (spd == SPEED_2500) {
+			gem_writel(bp, DIV_SEL0_LN, 0x1);
+			gem_writel(bp, DIV_SEL1_LN, 0x2);
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x1);
+			gem_writel(bp, TX_CLK_SEL2, 0x1);
+			gem_writel(bp, TX_CLK_SEL3, 0x1);
+			gem_writel(bp, RX_CLK_SEL0, 0x1);
+			gem_writel(bp, RX_CLK_SEL1, 0x0);
+			gem_writel(bp, TX_CLK_SEL3_0, 0x0);
+			gem_writel(bp, TX_CLK_SEL4_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL3_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL4_0, 0x0);
+			speed = HS_SPEED_2500M;
+		} else if (spd == SPEED_1000) {
+			gem_writel(bp, DIV_SEL0_LN, 0x4);
+			gem_writel(bp, DIV_SEL1_LN, 0x8);
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x0);
+			gem_writel(bp, TX_CLK_SEL2, 0x0);
+			gem_writel(bp, TX_CLK_SEL3, 0x1);
+			gem_writel(bp, RX_CLK_SEL0, 0x1);
+			gem_writel(bp, RX_CLK_SEL1, 0x0);
+			gem_writel(bp, TX_CLK_SEL3_0, 0x0);
+			gem_writel(bp, TX_CLK_SEL4_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL3_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL4_0, 0x0);
+			speed = HS_SPEED_1000M;
+		} else if (spd == SPEED_100 || spd == SPEED_10) {
+			gem_writel(bp, DIV_SEL0_LN, 0x4);
+			gem_writel(bp, DIV_SEL1_LN, 0x8);
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x0);
+			gem_writel(bp, TX_CLK_SEL2, 0x1);
+			gem_writel(bp, TX_CLK_SEL3, 0x1);
+			gem_writel(bp, RX_CLK_SEL0, 0x1);
+			gem_writel(bp, RX_CLK_SEL1, 0x0);
+			gem_writel(bp, TX_CLK_SEL3_0, 0x1);
+			gem_writel(bp, TX_CLK_SEL4_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL3_0, 0x0);
+			gem_writel(bp, RX_CLK_SEL4_0, 0x1);
+			speed = HS_SPEED_100M;
+		}
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII) {
+		if (spd == SPEED_1000) {
+			gem_writel(bp, MII_SELECT, 0x1);
+			gem_writel(bp, SEL_MII_ON_RGMII, 0x0);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x1);
+			gem_writel(bp, TX_CLK_SEL2, 0x0);
+			gem_writel(bp, TX_CLK_SEL3, 0x0);
+			gem_writel(bp, RX_CLK_SEL0, 0x0);
+			gem_writel(bp, RX_CLK_SEL1, 0x1);
+			gem_writel(bp, CLK_250M_DIV10_DIV100_SEL, 0x0);
+			gem_writel(bp, RX_CLK_SEL5, 0x1);
+			gem_writel(bp, RGMII_TX_CLK_SEL0, 0x1);
+			gem_writel(bp, RGMII_TX_CLK_SEL1, 0x0);
+			speed = HS_SPEED_1000M;
+		} else if (spd == SPEED_100) {
+			gem_writel(bp, MII_SELECT, 0x1);
+			gem_writel(bp, SEL_MII_ON_RGMII, 0x0);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x1);
+			gem_writel(bp, TX_CLK_SEL2, 0x0);
+			gem_writel(bp, TX_CLK_SEL3, 0x0);
+			gem_writel(bp, RX_CLK_SEL0, 0x0);
+			gem_writel(bp, RX_CLK_SEL1, 0x1);
+			gem_writel(bp, CLK_250M_DIV10_DIV100_SEL, 0x0);
+			gem_writel(bp, RX_CLK_SEL5, 0x1);
+			gem_writel(bp, RGMII_TX_CLK_SEL0, 0x0);
+			gem_writel(bp, RGMII_TX_CLK_SEL1, 0x0);
+			speed = HS_SPEED_100M;
+		} else {
+			gem_writel(bp, MII_SELECT, 0x1);
+			gem_writel(bp, SEL_MII_ON_RGMII, 0x0);
+			gem_writel(bp, TX_CLK_SEL0, 0x0);
+			gem_writel(bp, TX_CLK_SEL1, 0x1);
+			gem_writel(bp, TX_CLK_SEL2, 0x0);
+			gem_writel(bp, TX_CLK_SEL3, 0x0);
+			gem_writel(bp, RX_CLK_SEL0, 0x0);
+			gem_writel(bp, RX_CLK_SEL1, 0x1);
+			gem_writel(bp, CLK_250M_DIV10_DIV100_SEL, 0x1);
+			gem_writel(bp, RX_CLK_SEL5, 0x1);
+			gem_writel(bp, RGMII_TX_CLK_SEL0, 0x0);
+			gem_writel(bp, RGMII_TX_CLK_SEL1, 0x0);
+			speed = HS_SPEED_100M;
+		}
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII) {
+		speed = HS_SPEED_100M;
+		gem_writel(bp, RX_CLK_SEL5, 0x1);
+	}
+
+	gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, speed,
+						gem_readl(bp, HS_MAC_CONFIG)));
+
+	return 0;
+}
+
 static void macb_usx_pcs_link_up(struct phylink_pcs *pcs, unsigned int neg_mode,
 				 phy_interface_t interface, int speed,
 				 int duplex)
@@ -778,6 +896,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 
 	if (!(bp->caps & MACB_CAPS_MACB_IS_EMAC))
 		macb_set_tx_clk(bp, speed);
+
+	if (bp->caps & MACB_CAPS_SEL_CLK_HW)
+		phytium_gem_sel_clk(bp, speed);
 
 	/* Enable Rx and Tx; Enable PTP unicast */
 	ctrl = macb_readl(bp, NCR);
@@ -4929,7 +5050,8 @@ static const struct macb_config versal_config = {
 
 static const struct macb_config phytium_config = {
 	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE | MACB_CAPS_JUMBO |
-		MACB_CAPS_GEM_HAS_PTP |	MACB_CAPS_BD_RD_PREFETCH,
+		MACB_CAPS_GEM_HAS_PTP |	MACB_CAPS_BD_RD_PREFETCH |
+		MACB_CAPS_SEL_CLK_HW,
 	.dma_burst_length = 16,
 	.clk_init = macb_clk_init,
 	.init = macb_init,
