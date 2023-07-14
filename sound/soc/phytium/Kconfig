@@ -14,3 +14,11 @@ config SND_PMDK_ES8388
 	help
 	 Say Y if you want to add Phytium machine support for
 	 ES8388 codecs.
+
+config SND_PMDK_ES8336
+	tristate "Phytium machine support with ES8336"
+	depends on I2C && SND_SOC_PHYTIUM_I2S
+	select SND_SOC_ES8336
+	help
+	 Say Y if you want to add Phytium machine support for
+	 ES8336 codecs.
