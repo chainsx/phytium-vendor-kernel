@@ -2544,6 +2544,7 @@ F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
 F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	arch/arm64/boot/dts/phytium/*
+F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
