@@ -2559,6 +2559,7 @@ F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/net/can/phytium/*
+F:	drivers/pwm/pwm-phytium.c
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-qspi.c
 F:	drivers/tty/serial/phytium-uart.c
