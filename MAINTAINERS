@@ -2527,15 +2527,16 @@ W:	http://www.digriz.org.uk/ts78xx/kernel
 F:	arch/arm/mach-orion5x/ts78xx-*
 
 ARM/PHYTIUM SOC SUPPORT
-M:     Chen Baozi <chenbaozi@phytium.com.cn>
-S:     Maintained
-W:     https://www.phytium.com.cn
-F:     Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
-F:     Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
-F:     Documentation/devicetree/bindings/spi/phytium,spi.yaml
-F:     arch/arm64/boot/dts/phytium/*
-F:     drivers/gpio/gpio-phytium*
-F:     drivers/mmc/host/phytium-sdci.*
+M:	Chen Baozi <chenbaozi@phytium.com.cn>
+S:	Maintained
+W:	https://www.phytium.com.cn
+F:	Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
+F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
+F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
+F:	arch/arm64/boot/dts/phytium/*
+F:	drivers/gpio/gpio-phytium*
+F:	drivers/mmc/host/phytium-sdci.*
+F:	drivers/spi/spi-phytium*
 
 ARM/QUALCOMM CHROMEBOOK SUPPORT
 R:	cros-qcom-dts-watchers@chromium.org
