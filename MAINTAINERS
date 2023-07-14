@@ -2551,6 +2551,7 @@ F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/iio/adc/phytium-adc.c
 F:	drivers/input/serio/phytium-ps2.c
+F:	drivers/media/platform/phytium-jpeg/phytium_jpeg*
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
