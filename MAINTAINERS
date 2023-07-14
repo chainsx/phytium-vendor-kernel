@@ -2550,6 +2550,7 @@ F:	Documentation/devicetree/bindings/w1/phytium,w1.yaml
 F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/gpio/gpio-phytium*
+F:	drivers/gpio/gpio-phytium-sgpio.c
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/iio/adc/phytium-adc.c
