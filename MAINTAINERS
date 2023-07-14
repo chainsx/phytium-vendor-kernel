@@ -2540,6 +2540,7 @@ F:	Documentation/devicetree/bindings/iio/adc/phytium,adc.yaml
 F:	Documentation/devicetree/bindings/input/phytium,keypad.yaml
 F:	Documentation/devicetree/bindings/ipmi/phytium,bt-bmc.yaml
 F:	Documentation/devicetree/bindings/ipmi/phytium,kcs-bmc.yaml
+F:	Documentation/devicetree/bindings/mailbox/phytium,mbox.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,mci.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
 F:	Documentation/devicetree/bindings/mtd/phytium,nfc.yaml
