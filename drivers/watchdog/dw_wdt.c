@@ -12,6 +12,7 @@
  * heartbeat requests after the watchdog device has been closed.
  */
 
+#include <linux/acpi.h>
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/debugfs.h>
@@ -83,7 +84,7 @@ struct dw_wdt {
 	void __iomem		*regs;
 	struct clk		*clk;
 	struct clk		*pclk;
-	unsigned long		rate;
+	u64			rate;
 	enum dw_wdt_rmod	rmod;
 	struct dw_wdt_timeout	timeouts[DW_WDT_NUM_TOPS];
 	struct watchdog_device	wdd;
@@ -560,33 +561,45 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 	if (IS_ERR(dw_wdt->regs))
 		return PTR_ERR(dw_wdt->regs);
 
-	/*
-	 * Try to request the watchdog dedicated timer clock source. It must
-	 * be supplied if asynchronous mode is enabled. Otherwise fallback
-	 * to the common timer/bus clocks configuration, in which the very
-	 * first found clock supply both timer and APB signals.
-	 */
-	dw_wdt->clk = devm_clk_get_enabled(dev, "tclk");
-	if (IS_ERR(dw_wdt->clk)) {
-		dw_wdt->clk = devm_clk_get_enabled(dev, NULL);
-		if (IS_ERR(dw_wdt->clk))
-			return PTR_ERR(dw_wdt->clk);
+	if (dev->of_node) {
+		/*
+		 * Try to request the watchdog dedicated timer clock source. It must
+		 * be supplied if asynchronous mode is enabled. Otherwise fallback
+		 * to the common timer/bus clocks configuration, in which the very
+		 * first found clock supply both timer and APB signals.
+		 */
+		dw_wdt->clk = devm_clk_get_enabled(dev, "tclk");
+		if (IS_ERR(dw_wdt->clk)) {
+			dw_wdt->clk = devm_clk_get_enabled(dev, NULL);
+			if (IS_ERR(dw_wdt->clk))
+				return PTR_ERR(dw_wdt->clk);
+		}
+
+		dw_wdt->rate = clk_get_rate(dw_wdt->clk);
+		if (dw_wdt->rate == 0)
+			return -EINVAL;
+
+		/*
+		 * Request APB clock if device is configured with async clocks mode.
+		 * In this case both tclk and pclk clocks are supposed to be specified.
+		 * Alas we can't know for sure whether async mode was really activated,
+		 * so the pclk phandle reference is left optional. If it couldn't be
+		 * found we consider the device configured in synchronous clocks mode.
+		 */
+		dw_wdt->pclk = devm_clk_get_optional_enabled(dev, "pclk");
+		if (IS_ERR(dw_wdt->pclk))
+			return PTR_ERR(dw_wdt->pclk);
+	} else if (has_acpi_companion(&pdev->dev)) {
+		/*
+		 * When Driver probe with ACPI device, clock devices
+		 * are not available, so watchdog rate get from
+		 * clock-frequency property given in _DSD object.
+		 */
+		device_property_read_u64(dev, "clock-frequency",
+					 &dw_wdt->rate);
+		if (dw_wdt->rate == 0)
+			return -EINVAL;
 	}
-
-	dw_wdt->rate = clk_get_rate(dw_wdt->clk);
-	if (dw_wdt->rate == 0)
-		return -EINVAL;
-
-	/*
-	 * Request APB clock if device is configured with async clocks mode.
-	 * In this case both tclk and pclk clocks are supposed to be specified.
-	 * Alas we can't know for sure whether async mode was really activated,
-	 * so the pclk phandle reference is left optional. If it couldn't be
-	 * found we consider the device configured in synchronous clocks mode.
-	 */
-	dw_wdt->pclk = devm_clk_get_optional_enabled(dev, "pclk");
-	if (IS_ERR(dw_wdt->pclk))
-		return PTR_ERR(dw_wdt->pclk);
 
 	dw_wdt->rst = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
 	if (IS_ERR(dw_wdt->rst))
@@ -674,6 +687,12 @@ static void dw_wdt_drv_remove(struct platform_device *pdev)
 	reset_control_assert(dw_wdt->rst);
 }
 
+static const struct acpi_device_id dw_wdt_acpi_match[] = {
+	{ "PHYT0014", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, dw_wdt_acpi_match);
+
 #ifdef CONFIG_OF
 static const struct of_device_id dw_wdt_of_match[] = {
 	{ .compatible = "snps,dw-wdt", },
@@ -688,6 +707,7 @@ static struct platform_driver dw_wdt_driver = {
 	.driver		= {
 		.name	= "dw_wdt",
 		.of_match_table = of_match_ptr(dw_wdt_of_match),
+		.acpi_match_table = ACPI_PTR(dw_wdt_acpi_match),
 		.pm	= pm_sleep_ptr(&dw_wdt_pm_ops),
 	},
 };
