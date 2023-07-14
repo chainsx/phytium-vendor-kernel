@@ -2539,6 +2539,7 @@ F:	Documentation/devicetree/bindings/spi/phytium,qspi-nor.yaml
 F:	Documentation/devicetree/bindings/spi/phytium,spi.yaml
 F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/gpio/gpio-phytium*
+F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/input/serio/phytium-ps2.c
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/net/can/phytium/*
