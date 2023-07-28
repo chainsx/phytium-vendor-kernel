@@ -1146,6 +1146,7 @@ static irqreturn_t phytium_mci_irq(int irq, void *dev_id)
 	cmd = host->cmd;
 	data = host->data;
 
+#if 0
 	if (((events & event_mask) & MCI_RAW_INTS_SDIO) &&
 	    ((events == 0x10001) || (events == 0x10000) || (events == 0x10040))) {
 		writel(events, host->base + MCI_RAW_INTS);
@@ -1154,10 +1155,19 @@ static irqreturn_t phytium_mci_irq(int irq, void *dev_id)
 		spin_unlock_irqrestore(&host->lock, flags);
 		goto irq_out;
 	}
+#endif
+	if ((events & event_mask) & MCI_RAW_INTS_SDIO) {
+		__phytium_mci_enable_sdio_irq(host, 0);
+	}
+
 
 	writel(events, host->base + MCI_RAW_INTS);
 	writel(dmac_events, host->base + MCI_DMAC_STATUS);
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	if ((events & event_mask) & MCI_RAW_INTS_SDIO) {
+		sdio_signal_irq(host->mmc);
+	}
 
 	if (((events & event_mask) == 0) && ((dmac_evt_mask & dmac_events) == 0))
 		goto irq_out;
