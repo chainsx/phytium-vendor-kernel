@@ -8,3 +8,4 @@ dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-edu-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-come-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-power-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-hanwei-board.dtb
+dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-chillipi-edu-board.dtb
