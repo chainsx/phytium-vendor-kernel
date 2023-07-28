@@ -30,6 +30,7 @@
 #include <linux/suspend.h>
 #include <linux/switchtec.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+#include <linux/crash_dump.h>
 #include "pci.h"
 
 static ktime_t fixup_debug_start(struct pci_dev *dev,
@@ -3876,12 +3877,12 @@ static int nvme_disable_and_flr(struct pci_dev *dev, int probe)
 	void __iomem *bar;
 	u16 cmd;
 	u32 cfg;
-
+	printk("%s began\n", __func__);
 	if (dev->class != PCI_CLASS_STORAGE_EXPRESS ||
 	    !pcie_has_flr(dev) || !pci_resource_start(dev, 0))
 		return -ENOTTY;
 
-	if (probe)
+	if (probe & !is_kdump_kernel())
 		return 0;
 
 	bar = pci_iomap(dev, 0, NVME_REG_CC + sizeof(cfg));
@@ -3935,7 +3936,7 @@ static int nvme_disable_and_flr(struct pci_dev *dev, int probe)
 	pci_iounmap(dev, bar);
 
 	pcie_flr(dev);
-
+	printk("%s finished\n", __func__);
 	return 0;
 }
 
@@ -4031,6 +4032,7 @@ static const struct pci_dev_reset_methods pci_dev_reset_methods[] = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IVB_M2_VGA,
 		reset_ivb_igd },
 	{ PCI_VENDOR_ID_SAMSUNG, 0xa804, nvme_disable_and_flr },
+	{ PCI_VENDOR_ID_SAMSUNG, 0xa809, nvme_disable_and_flr },
 	{ PCI_VENDOR_ID_INTEL, 0x0953, delay_250ms_after_flr },
 	{ PCI_VENDOR_ID_CHELSIO, PCI_ANY_ID,
 		reset_chelsio_generic_dev },
