@@ -674,6 +674,8 @@ static int macb_mii_probe(struct net_device *dev)
 			}
 		}
 
+		phydev->force_mode = bp->force_phy_mode;
+
 		/* attach the mac to the phy */
 		ret = phy_connect_direct(dev, phydev, &macb_handle_link_change,
 					 bp->phy_interface);

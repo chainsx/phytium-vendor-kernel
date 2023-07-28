@@ -45,7 +45,7 @@
 /* if system depends on ethernet packet to restore from sleep,
  * please define this macro to 1 otherwise, define it to 0.
  */
-#define SYS_WAKEUP_BASED_ON_ETH_PKT     1
+#define SYS_WAKEUP_BASED_ON_ETH_PKT     0
 
 /* to enable system WOL feature of phy, please define this macro to 1
  * otherwise, define it to 0.
@@ -260,7 +260,7 @@ static inline int __phy_write(struct phy_device *phydev, u32 regnum, u16 val)
 static int ytphy_read_ext(struct phy_device *phydev, u32 regnum)
 {
 	int ret;
-	
+
 	phy_lock_mdio_bus(phydev);
 	ret = __phy_write(phydev, REG_DEBUG_ADDR_OFFSET, regnum);
 	if (ret < 0)
@@ -269,7 +269,7 @@ static int ytphy_read_ext(struct phy_device *phydev, u32 regnum)
 	ret = __phy_read(phydev, REG_DEBUG_DATA);
 	if (ret < 0)
 		goto err_handle;
-	
+
 err_handle:
 	phy_unlock_mdio_bus(phydev);
 	return ret;
@@ -287,7 +287,7 @@ static int ytphy_write_ext(struct phy_device *phydev, u32 regnum, u16 val)
 	ret = __phy_write(phydev, REG_DEBUG_DATA, val);
 	if (ret < 0)
 		goto err_handle;
-	
+
 err_handle:
 	phy_unlock_mdio_bus(phydev);
 	return ret;
@@ -450,7 +450,7 @@ static int yt8512_config_init(struct phy_device *phydev)
 {
 	int ret;
 	int val;
-	
+
 #if (KERNEL_VERSION(4, 0, 0) > LINUX_VERSION_CODE) || (KERNEL_VERSION(5, 3, 0) < LINUX_VERSION_CODE)
 	ret = ytphy_config_init(phydev);
 #else
@@ -964,7 +964,7 @@ int yt8521_aneg_done(struct phy_device *phydev)
 	ytphy_write_ext(phydev, 0xa000, 0);
 	if (!link_fiber)
 		link_utp = !!(phy_read(phydev, REG_PHY_SPEC_STATUS) & (BIT(YT8521_LINK_STATUS_BIT)));
-	
+
 #if (KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE)
 	netdev_info(phydev->attached_dev, "%s, phy addr: %d, link_fiber: %d, link_utp: %d\n",
 		__func__, phydev->addr, link_fiber, link_utp);
@@ -1024,7 +1024,7 @@ static int yt8521_read_status(struct phy_device *phydev)
 		link = val & (BIT(YT8521_LINK_STATUS_BIT));
 		if (link && yt8521_fiber_latch_val != yt8521_fiber_curr_val) {
 			link = 0;
-#if (KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE)            
+#if (KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE)
 			netdev_info(phydev->attached_dev, "%s, phy addr: %d, fiber link down detect, latch = %04x, curr = %04x\n",
 				__func__, phydev->addr, yt8521_fiber_latch_val, yt8521_fiber_curr_val);
 #else
@@ -1123,19 +1123,16 @@ int yt8521_resume(struct phy_device *phydev)
 	/* no need lock/unlock in 4.19 */
 #endif
 
-	if (YT8521_PHY_MODE_CURR != YT8521_PHY_MODE_FIBER) {
-		ytphy_write_ext(phydev, 0xa000, 0);
-		value = phy_read(phydev, MII_BMCR);
-		phy_write(phydev, MII_BMCR, value & ~BMCR_PDOWN);
-	}
+	/* power down both sds & phy in suspend, power up both too */
+	ytphy_write_ext(phydev, 0xa000, 0);
+	value = phy_read(phydev, MII_BMCR);
+	phy_write(phydev, MII_BMCR, value & ~BMCR_PDOWN);
 
-	if (YT8521_PHY_MODE_CURR != YT8521_PHY_MODE_UTP) {
-		ytphy_write_ext(phydev, 0xa000, 2);
-		value = phy_read(phydev, MII_BMCR);
-		phy_write(phydev, MII_BMCR, value & ~BMCR_PDOWN);
+	ytphy_write_ext(phydev, 0xa000, 2);
+	value = phy_read(phydev, MII_BMCR);
+	phy_write(phydev, MII_BMCR, value & ~BMCR_PDOWN);
 
-		ytphy_write_ext(phydev, 0xa000, 0);
-	}
+	ytphy_write_ext(phydev, 0xa000, 0);
 
 #if (KERNEL_VERSION(4, 0, 0) > LINUX_VERSION_CODE)
 	mutex_unlock(&phydev->lock);
@@ -1466,7 +1463,7 @@ int yt8614_aneg_done(struct phy_device *phydev)
 		ytphy_write_ext(phydev, 0xa000, 3);
 		link_fiber = !!(phy_read(phydev, REG_PHY_SPEC_STATUS) & (BIT(YT8521_LINK_STATUS_BIT)));
 	}
-	
+
 	if (YT8614_PHY_MODE_CURR & YT_PHY_MODE_UTP) {
 		/* reading UTP */
 		ytphy_write_ext(phydev, 0xa000, 0);
@@ -1940,7 +1937,7 @@ static int yt8821_config_init(struct phy_device *phydev)
 	ret = ytphy_write_ext(phydev, YT8521_EXTREG_SLEEP_CONTROL1, val);
 	if (ret < 0)
 		return ret;
-	
+
 #if (KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE)
 	netdev_info(phydev->attached_dev, "%s done, phy addr: %d, strap mode = %d\n", __func__, phydev->addr, hw_strap_mode);
 #else
