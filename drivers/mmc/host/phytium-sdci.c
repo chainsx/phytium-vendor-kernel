@@ -1215,7 +1215,7 @@ static int phytium_sdci_probe(struct platform_device *pdev)
 			return -ENODEV;
 		}
 
-		acpi_dma_configure(dev, DEV_DMA_NOT_SUPPORTED);
+		acpi_dma_configure(dev, DEV_DMA_NON_COHERENT);
 
 		host->clk_rate = 600000000;
 	} else {
