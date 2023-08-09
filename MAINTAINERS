@@ -2561,6 +2561,7 @@ F:	arch/arm64/boot/dts/phytium/*
 F:	drivers/char/hw_random/phytium-rng.c
 F:	drivers/char/ipmi/bt_bmc_phytium.c
 F:	drivers/char/ipmi/kcs_bmc_phytium.c
+F:	drivers/edac/phytium_pe220x_edac.c
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/gpio/gpio-phytium-sgpio.c
 F:	drivers/gpu/drm/phytium/*
