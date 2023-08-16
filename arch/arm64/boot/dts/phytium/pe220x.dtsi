@@ -971,5 +971,13 @@
 			status = "disabled";
 		};
 
+		edac: edac@32b28000 {
+			compatible = "phytium,e2000-edac";
+			reg = <0x0 0x32b28000 0x0 0x1000>,
+				<0x0 0x31400000 0x0 0x1000>,
+				<0x0 0x31401000 0x0 0x1000>;
+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+		};
 	};
 };
