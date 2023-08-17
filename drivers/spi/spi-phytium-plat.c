@@ -7,7 +7,6 @@
  * Derived from drivers/spi/spi-dw-pci.c
  *   Copyright (c) 2009, 2014 Intel Corporation.
  */
-
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -51,6 +50,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	fts->paddr = mem->start;
 	fts->regs = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(fts->regs)) {
 		dev_err(&pdev->dev, "SPI region map failed\n");
@@ -81,9 +81,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	device_property_read_u32(&pdev->dev, "reg-io-width", &fts->reg_io_width);
 
 	num_cs = 4;
-
 	device_property_read_u32(&pdev->dev, "num-cs", &num_cs);
-
 	fts->num_cs = num_cs;
 
 	if (pdev->dev.of_node) {
@@ -110,7 +108,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 		int *cs;
 		struct gpio_desc *gpiod;
 
-		n =  gpiod_count(&pdev->dev, "cs");
+		n = gpiod_count(&pdev->dev, "cs");
 
 		cs = devm_kcalloc(&pdev->dev, n, sizeof(int), GFP_KERNEL);
 		fts->cs = cs;
@@ -131,6 +129,14 @@ static int phytium_spi_probe(struct platform_device *pdev)
 
 	device_property_read_u32(&pdev->dev, "global-cs", &global_cs);
 	fts->global_cs = global_cs;
+
+	/* check is use dma transfer */
+	if ((device_property_read_string_array(&pdev->dev, "dma-names",
+					NULL, 0) > 0) &&
+		device_property_present(&pdev->dev, "dmas")) {
+		fts->dma_en = true;
+		phytium_spi_dmaops_set(fts);
+	}
 
 	ret = phytium_spi_add_host(&pdev->dev, fts);
 	if (ret)
