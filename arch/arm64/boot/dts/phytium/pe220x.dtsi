@@ -207,6 +207,22 @@
 			status = "disabled";
 		};
 
+		ddma0: ddma@28003000 {
+			compatible = "phytium,ddma";
+			reg = <0x0 0x28003000 0x0 0x1000>;
+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <2>;
+			dma-channels = <8>;
+		};
+
+		ddma1: ddma@28004000 {
+			compatible = "phytium,ddma";
+			reg = <0x0 0x28004000 0x0 0x1000>;
+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <2>;
+			dma-channels = <8>;
+		};
+
 		qspi0: spi@28008000 {
 			compatible = "phytium,qspi";
 			reg = <0x0 0x28008000 0x0     0x1000>,
