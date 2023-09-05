@@ -330,7 +330,7 @@ static int homo_rproc_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id homo_rproc_ids[] = {
-	{ .compatible = "phytium,rproc", },
+	{ .compatible = "homo,rproc", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, homo_rproc_ids);
