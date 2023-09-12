@@ -9,6 +9,8 @@
  */
 #include <linux/module.h>
 #include <linux/of_address.h>
+#include <linux/of_irq.h>
+#include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/arm-smccc.h>
 #include <linux/irqchip/arm-gic-v3.h>
@@ -89,11 +91,6 @@ static void homo_rproc_vq_irq(struct work_struct *work)
 	rproc_vq_interrupt(rproc, rsc->rpmsg_vring0.notifyid);
 }
 
-static void homo_rproc_interrupt(void)
-{
-	schedule_work(&workqueue);
-}
-
 static int homo_rproc_start(struct rproc *rproc)
 {
 	struct homo_rproc *priv = rproc->priv;
@@ -171,10 +168,16 @@ static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t p
 	return (void __iomem *)(vaddr + offset);
 }
 
+static irqreturn_t homo_rproc_irq_handler(int irq, void *data)
+{
+	schedule_work(&workqueue);
+	return IRQ_HANDLED;
+}
+
 static int homo_rproc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
+	struct device_node *np = dev->of_node, *p;
 	struct device_node *np_mem;
 	struct resource res;
 	struct rproc *rproc;
@@ -182,10 +185,12 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	struct homo_rproc *priv;
 	int ret;
 	unsigned int ipi, cpu;
+	int irq;
+	struct of_phandle_args oirq;
 
 	ret = rproc_of_parse_firmware(dev, 0, &fw_name);
 	if (ret) {
-		dev_err(dev, "Failed to parse firmware-name property, ret = %d\n", ret);
+		dev_err(dev, "failed to parse firmware-name property, ret = %d\n", ret);
 		return ret;
 	}
 
@@ -203,12 +208,12 @@ static int homo_rproc_probe(struct platform_device *pdev)
 
 	/* The following values can be modified through devicetree 'homo_rproc' node */
 	if (of_property_read_u32(np, "remote-processor", &cpu)) {
-		dev_err(dev, "Not found 'remote-processor' property\n");
+		dev_err(dev, "not found 'remote-processor' property\n");
 		return -EINVAL;
 	}
 
 	if (of_property_read_u32(np, "inter-processor-interrupt", &ipi)) {
-		dev_err(dev, "Not found 'inter-processor-interrupt' property\n");
+		dev_err(dev, "not found 'inter-processor-interrupt' property\n");
 		return -EINVAL;
 	}
 
@@ -220,7 +225,7 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	np_mem = of_parse_phandle(np, "memory-region", 0);
 	ret = of_address_to_resource(np_mem, 0, &res);
 	if (ret) {
-		dev_err(dev, "Can't find memory-region for Baremetal\n");
+		dev_err(dev, "can't find memory-region for Baremetal\n");
 		return ret;
 	}
 
@@ -234,14 +239,34 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	priv->addr = homo_ioremap_prot(priv->phys_addr, priv->size, PAGE_KERNEL_EXEC);
 	if (!priv->addr) {
 		dev_err(dev, "ioremap failed\n");
-		return -EINVAL;
+		return -ENOMEM;
 	}
 	dev_info(dev, "ioremap: phys_addr = %016llx, addr = %llx, size = %lld\n",
 			priv->phys_addr, (u64)(priv->addr), priv->size);
 
-	rproc_set_handle_irq(homo_rproc_interrupt);
+	/* Look for the interrupt parent. */
+	p = of_irq_find_parent(np);
+	if (p == NULL)
+		return -EINVAL;
 
-	rproc_add(rproc);
+	oirq.np = p;
+	oirq.args_count = 1;
+	oirq.args[0] = ipi;
+	irq = irq_create_of_mapping(&oirq);
+
+	ret = request_percpu_irq(irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
+	if (ret) {
+		dev_err(dev, "failed to request percpu irq, status = %d\n", ret);
+		return ret;
+	}
+
+	enable_percpu_irq(irq, IRQ_TYPE_NONE);
+
+	ret = rproc_add(rproc);
+	if (ret) {
+		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
