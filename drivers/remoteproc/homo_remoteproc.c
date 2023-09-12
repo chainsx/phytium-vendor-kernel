@@ -55,14 +55,6 @@ struct homo_rproc {
 static struct homo_rproc *g_priv;
 static struct work_struct workqueue;
 
-static unsigned int cpuid = 3;
-module_param(cpuid, uint, 0);
-MODULE_PARM_DESC(cpuid, "Cpu logical number used exclusively by the remote processor. default is 3.");
-
-static unsigned int sgi = 9;
-module_param(sgi, uint, 0);
-MODULE_PARM_DESC(sgi, "GIC SGI interrupt number for communication with remote processor. default is 9");
-
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
 
 void gicv3_ipi_send_single(int irq, u64 mpidr)
@@ -156,18 +148,44 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	struct device_node *np_mem;
 	struct resource res;
 	struct rproc *rproc;
+	const char *fw_name;
 	struct homo_rproc *priv;
 	int ret;
+	unsigned int ipi, cpu;
 
-	rproc = rproc_alloc(dev, np->name, &homo_rproc_ops,
-			"openamp_core0.elf", sizeof(*priv));
+	ret = rproc_of_parse_firmware(dev, 0, &fw_name);
+	if (ret) {
+		dev_err(dev, "Failed to parse firmware-name property, ret = %d\n", ret);
+		return ret;
+	}
+
+	rproc = rproc_alloc(dev, np->name, &homo_rproc_ops, fw_name, sizeof(*priv));
 	if (!rproc)
 		return -ENOMEM;
+
+	rproc->auto_boot = false;
+	rproc->has_iommu = false;
 
 	platform_set_drvdata(pdev, rproc);
 
 	priv = g_priv = rproc->priv;
 	priv->rproc = rproc;
+
+	/* The following values can be modified through devicetree 'homo_rproc' node */
+	if (of_property_read_u32(np, "remote-processor", &cpu)) {
+		dev_err(dev, "Not found 'remote-processor' property\n");
+		return -EINVAL;
+	}
+
+	if (of_property_read_u32(np, "inter-processor-interrupt", &ipi)) {
+		dev_err(dev, "Not found 'inter-processor-interrupt' property\n");
+		return -EINVAL;
+	}
+
+	priv->cpu = cpu;
+	priv->irq = ipi;
+
+	dev_info(dev, "remote-processor = %d, inter-processor-interrupt = %d\n", cpu, ipi);
 
 	np_mem = of_parse_phandle(np, "memory-region", 0);
 	ret = of_address_to_resource(np_mem, 0, &res);
@@ -178,9 +196,6 @@ static int homo_rproc_probe(struct platform_device *pdev)
 
 	priv->rsc = NULL;
 	priv->addr = NULL;
-	/* The following values can be modified through module parameters */
-	priv->irq = sgi;
-	priv->cpu = cpuid;
 
 	priv->phys_addr = res.start;
 	priv->size = resource_size(&res);
@@ -194,9 +209,6 @@ static int homo_rproc_probe(struct platform_device *pdev)
 			priv->phys_addr, (u64)(priv->addr), priv->size);
 
 	rproc_set_handle_irq(homo_rproc_interrupt);
-
-	rproc->auto_boot = false;
-	rproc->has_iommu = false;
 
 	rproc_add(rproc);
 
