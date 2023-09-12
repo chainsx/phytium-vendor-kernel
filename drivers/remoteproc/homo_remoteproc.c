@@ -141,6 +141,36 @@ static const struct rproc_ops homo_rproc_ops = {
 	.da_to_va = homo_rproc_da_to_va,
 };
 
+static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t prot)
+{
+	unsigned long offset, vaddr;
+	phys_addr_t last_addr;
+	struct vm_struct *area;
+
+	/* Disallow wrap-around or zero size */
+	last_addr = addr + size - 1;
+	if (!size || last_addr < addr)
+		return NULL;
+
+	/* Page-align mappings */
+	offset = addr & (~PAGE_MASK);
+	addr -= offset;
+	size = PAGE_ALIGN(size + offset);
+
+	area = get_vm_area_caller(size, VM_IOREMAP,
+			__builtin_return_address(0));
+	if (!area)
+		return NULL;
+	vaddr = (unsigned long)area->addr;
+
+	if (ioremap_page_range(vaddr, vaddr + size, addr, prot)) {
+		free_vm_area(area);
+		return NULL;
+	}
+
+	return (void __iomem *)(vaddr + offset);
+}
+
 static int homo_rproc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -200,10 +230,11 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	priv->phys_addr = res.start;
 	priv->size = resource_size(&res);
 
-	priv->addr = devm_ioremap_resource(dev, &res);
+	/* Map physical memory region reserved for homo remote processor. */
+	priv->addr = homo_ioremap_prot(priv->phys_addr, priv->size, PAGE_KERNEL_EXEC);
 	if (!priv->addr) {
 		dev_err(dev, "ioremap failed\n");
-		return -1;
+		return -EINVAL;
 	}
 	dev_info(dev, "ioremap: phys_addr = %016llx, addr = %llx, size = %lld\n",
 			priv->phys_addr, (u64)(priv->addr), priv->size);
