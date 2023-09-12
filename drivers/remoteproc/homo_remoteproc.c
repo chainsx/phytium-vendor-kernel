@@ -15,6 +15,8 @@
 #include <linux/arm-smccc.h>
 #include <linux/irqchip/arm-gic-v3.h>
 #include <linux/remoteproc.h>
+#include <linux/psci.h>
+#include <linux/cpu.h>
 
 #include "remoteproc_internal.h"
 
@@ -93,9 +95,14 @@ static void homo_rproc_vq_irq(struct work_struct *work)
 
 static int homo_rproc_start(struct rproc *rproc)
 {
+	int err;
 	struct homo_rproc *priv = rproc->priv;
 	int phys_cpuid = cpu_logical_map(priv->cpu);
 	struct arm_smccc_res smc_res;
+
+	err = psci_ops.affinity_info(phys_cpuid, 0);
+	if (err == 0)
+		remove_cpu(priv->cpu);
 
 	INIT_WORK(&workqueue, homo_rproc_vq_irq);
 
@@ -111,6 +118,13 @@ static int homo_rproc_start(struct rproc *rproc)
 
 static int homo_rproc_stop(struct rproc *rproc)
 {
+	int err;
+	struct homo_rproc *priv = rproc->priv;
+
+	err = psci_ops.affinity_info(cpu_logical_map(priv->cpu), 0);
+	if (err == 1)
+		add_cpu(priv->cpu);
+
 	return 0;
 }
 
