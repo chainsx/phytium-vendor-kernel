@@ -231,6 +231,12 @@ static int homo_rproc_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	/* The gic-v3 driver has registered the 0-7 range of SGI interrupt for system purpose */
+	if (ipi < NR_IPI + 1) {
+		dev_err(dev, "'inter-processor-interrupt' is %d, should be between 9~15\n", ipi);
+		return -EINVAL;
+	}
+
 	priv->cpu = cpu;
 	priv->irq = ipi;
 
