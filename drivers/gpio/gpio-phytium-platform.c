@@ -117,6 +117,10 @@ static int phytium_gpio_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
+	if (has_acpi_companion(dev)) {
+		acpi_gpiochip_request_interrupts(&gpio->gc);
+	}
+
 	platform_set_drvdata(pdev, gpio);
 	dev_info(dev, "Phytium GPIO controller @%pa registered\n",
 		&res->start);

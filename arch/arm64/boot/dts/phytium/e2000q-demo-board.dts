@@ -240,3 +240,6 @@
 	status = "okay";
 };
 
+&remoteproc {
+	status = "okay";
+};

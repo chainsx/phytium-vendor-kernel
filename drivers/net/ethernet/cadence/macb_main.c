@@ -82,6 +82,7 @@
 #define HS_SPEED_2500M		2
 #define HS_SPEED_5000M		3
 #define HS_SPEED_10000M		4
+#define MACB_SERDES_RATE_5G	0
 #define MACB_SERDES_RATE_10G	1
 
 #define MACB_WOL_HAS_MAGIC_PACKET	(0x1 << 0)
@@ -414,9 +415,79 @@ static void macb_set_tx_clk(struct clk *clk, int speed, struct net_device *dev)
 		netdev_err(dev, "adjusting tx_clk failed.\n");
 }
 
-static int phytium_gem_sel_clk(struct macb *bp)
+static int phytium_mac_config(struct macb *bp)
+{
+	u32 old_ctrl, ctrl;
+	u32 old_ncr, ncr;
+
+	netdev_dbg(bp->dev, "phytium mac config");
+
+	old_ncr = ncr = macb_readl(bp, NCR);
+	old_ctrl = ctrl = macb_or_gem_readl(bp, NCFGR);
+
+	ncr &= ~(GEM_BIT(ENABLE_HS_MAC) | MACB_BIT(2PT5G));
+	ctrl &= ~(GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL) | MACB_BIT(SPD) | MACB_BIT(FD));
+	if (macb_is_gem(bp))
+		ctrl &= ~GEM_BIT(GBE);
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		ctrl |= GEM_BIT(PCSSEL) | GEM_BIT(SGMIIEN);
+		ncr |= MACB_BIT(2PT5G);
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+		bp->phy_interface == PHY_INTERFACE_MODE_5GBASER) {
+		ctrl |= GEM_BIT(PCSSEL);
+		ncr |= GEM_BIT(ENABLE_HS_MAC);
+	}
+
+	if (bp->duplex)
+		ctrl |= MACB_BIT(FD);
+
+	/* Apply the new configuration, if any */
+	if (old_ctrl ^ ctrl)
+		macb_or_gem_writel(bp, NCFGR, ctrl);
+
+	if (old_ncr ^ ncr)
+		macb_or_gem_writel(bp, NCR, ncr);
+
+	return 0;
+}
+
+static void phytium_usx_pcs_link_up(struct macb *bp)
+{
+	u32 config;
+
+	if (bp->phy_interface !=  PHY_INTERFACE_MODE_USXGMII  &&
+	    bp->phy_interface != PHY_INTERFACE_MODE_5GBASER)
+		return;
+
+	netdev_dbg(bp->dev, "macb usx pcs link up");
+
+	config = gem_readl(bp, USX_CONTROL);
+	if (bp->speed == SPEED_10000) {
+		config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, config);
+		config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, config);
+	} else if (bp->speed == SPEED_5000) {
+		config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_5G, config);
+		config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_5000M, config);
+	}
+
+	config &= ~(GEM_BIT(TX_SCR_BYPASS) | GEM_BIT(RX_SCR_BYPASS));
+	// reset
+	config |= GEM_BIT(RX_SYNC_RESET);
+
+	gem_writel(bp, USX_CONTROL, config);
+
+	//enable rx and tx
+	config &= ~(GEM_BIT(RX_SYNC_RESET));
+	config |= GEM_BIT(SIGNAL_OK) | GEM_BIT(TX_EN);
+
+	gem_writel(bp, USX_CONTROL, config);
+}
+
+static void phytium_pe220x_sel_clk(struct macb *bp)
 {
 	int speed = 0;
+	dev_dbg(&bp->pdev->dev, "phytium pe220x sel clk config\n");
 
 	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
 		if (bp->speed == SPEED_10000) {
@@ -426,7 +497,15 @@ static int phytium_gem_sel_clk(struct macb *bp)
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1); /*0x1c10*/
 			speed = HS_SPEED_10000M;
 		}
-	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_5GBASER) {
+		if (bp->speed == SPEED_5000) {
+			gem_writel(bp, SRC_SEL_LN, 0x1); /*0x1c04*/
+			gem_writel(bp, DIV_SEL0_LN, 0x8); /*0x1c08*/
+			gem_writel(bp, DIV_SEL1_LN, 0x2); /*0x1c0c*/
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x0); /*0x1c10*/
+			speed = HS_SPEED_5000M;
+		}
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
 		if (bp->speed == SPEED_2500) {
 			gem_writel(bp, DIV_SEL0_LN, 0x1); /*0x1c08*/
 			gem_writel(bp, DIV_SEL1_LN, 0x2); /*0x1c0c*/
@@ -442,7 +521,9 @@ static int phytium_gem_sel_clk(struct macb *bp)
 			gem_writel(bp, RX_CLK_SEL3_0, 0x0); /*0x1c78*/
 			gem_writel(bp, RX_CLK_SEL4_0, 0x0); /*0x1c7c*/
 			speed = HS_SPEED_2500M;
-		} else if (bp->speed == SPEED_1000) {
+		}
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		if (bp->speed == SPEED_1000) {
 			gem_writel(bp, DIV_SEL0_LN, 0x4); /*0x1c08*/
 			gem_writel(bp, DIV_SEL1_LN, 0x8); /*0x1c0c*/
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1); /*0x1c10*/
@@ -525,8 +606,7 @@ static int phytium_gem_sel_clk(struct macb *bp)
 	/*HS_MAC_CONFIG(0x0050) provide rate to the external*/
 	gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, speed,
 						gem_readl(bp, HS_MAC_CONFIG)));
-
-	return 0;
+	return;
 }
 
 static void macb_handle_link_change(struct net_device *dev)
@@ -584,8 +664,8 @@ static void macb_handle_link_change(struct net_device *dev)
 			macb_set_tx_clk(bp->tx_clk, phydev->speed, dev);
 
 			/* phytium need hwclock */
-			if (bp->caps & MACB_CAPS_SEL_CLK_HW)
-				phytium_gem_sel_clk(bp);
+			if ((bp->caps & MACB_CAPS_SEL_CLK_HW) && bp->sel_clk_hw)
+				bp->sel_clk_hw(bp);
 
 			netif_carrier_on(dev);
 			netdev_info(dev, "link up (%d/%s)\n",
@@ -2385,31 +2465,6 @@ static void macb_configure_dma(struct macb *bp)
 	}
 }
 
-static int macb_usx_pcs_config(struct macb *bp)
-{
-	gem_writel(bp, USX_CONTROL, gem_readl(bp, USX_CONTROL) |
-		   GEM_BIT(SIGNAL_OK));
-
-	return 0;
-}
-
-static void macb_usx_pcs_link_up(struct macb *bp)
-{
-	u32 config;
-
-	config = gem_readl(bp, USX_CONTROL);
-	if (bp->speed == SPEED_10000) {
-		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_10000M,
-							gem_readl(bp, HS_MAC_CONFIG)));
-		config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, config);
-		config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, config);
-	}
-
-	config &= ~(GEM_BIT(TX_SCR_BYPASS) | GEM_BIT(RX_SCR_BYPASS));
-	config |= GEM_BIT(TX_EN);
-	gem_writel(bp, USX_CONTROL, config);
-}
-
 static void macb_init_hw(struct macb *bp)
 {
 	struct macb_queue *queue;
@@ -2441,10 +2496,15 @@ static void macb_init_hw(struct macb *bp)
 	if ((bp->caps & MACB_CAPS_JUMBO) && bp->jumbo_max_len)
 		gem_writel(bp, JML, bp->jumbo_max_len);
 
-	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
-		macb_usx_pcs_config(bp);
+	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_5GBASER ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		/* phytium need hwclock */
+		if (bp->caps & MACB_CAPS_SEL_CLK_HW)
+			bp->sel_clk_hw(bp);
+		phytium_mac_config(bp);
 		if (bp->link)
-			macb_usx_pcs_link_up(bp);
+			phytium_usx_pcs_link_up(bp);
 	} else {
 		bp->speed = SPEED_10;
 		bp->duplex = DUPLEX_HALF;
@@ -4194,7 +4254,7 @@ static const struct macb_config zynq_config = {
 	.init = macb_init,
 };
 
-static const struct macb_config phytium_config = {
+static const struct macb_config phytium_pe220x_config = {
 	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
 		MACB_CAPS_JUMBO |
 		MACB_CAPS_GEM_HAS_PTP |
@@ -4204,6 +4264,7 @@ static const struct macb_config phytium_config = {
 	.clk_init = macb_clk_init,
 	.init = macb_init,
 	.jumbo_max_len = 16360,
+	.sel_clk_hw = phytium_pe220x_sel_clk,
 };
 
 static const struct of_device_id macb_dt_ids[] = {
@@ -4221,7 +4282,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,emac", .data = &emac_config },
 	{ .compatible = "cdns,zynqmp-gem", .data = &zynqmp_config},
 	{ .compatible = "cdns,zynq-gem", .data = &zynq_config },
-	{ .compatible = "cdns,phytium-gem", .data = &phytium_config },
+	{ .compatible = "cdns,phytium-gem", .data = &phytium_pe220x_config },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, macb_dt_ids);
@@ -4229,7 +4290,7 @@ MODULE_DEVICE_TABLE(of, macb_dt_ids);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id macb_acpi_ids[] = {
-	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_config },
+	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_pe220x_config },
 	{ }
 };
 
@@ -4360,6 +4421,8 @@ static int macb_probe(struct platform_device *pdev)
 	bp->tsu_clk = tsu_clk;
 	if (macb_config)
 		bp->jumbo_max_len = macb_config->jumbo_max_len;
+	if (macb_config)
+		bp->sel_clk_hw = macb_config->sel_clk_hw;
 
 	bp->wol = 0;
 	if (device_property_read_bool(&pdev->dev, "magic-packet"))
@@ -4435,6 +4498,18 @@ static int macb_probe(struct platform_device *pdev)
 		bp->link = 1;
 		bp->duplex = 1;
 		bp->speed = SPEED_10000;
+	}
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_5GBASER) {
+		bp->link = 1;
+		bp->duplex = 1;
+		bp->speed = SPEED_5000;
+	}
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		bp->link = 1;
+		bp->duplex = 1;
+		bp->speed = SPEED_2500;
 	}
 
 	/* IP specific init */

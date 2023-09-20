@@ -178,6 +178,14 @@ config ST_REMOTEPROC
 	  processor framework.
 	  This can be either built-in or a loadable module.
 
+config HOMO_REMOTEPROC
+    tristate "homogeneous remoteproc support"
+    select RPMSG_VIRTIO
+    select RPMSG_CHAR
+    help
+      Say y here to support homogeneous processors via the remote processor framework.
+      This can be either built-in or a loadable module.
+
 config ST_SLIM_REMOTEPROC
 	tristate
 

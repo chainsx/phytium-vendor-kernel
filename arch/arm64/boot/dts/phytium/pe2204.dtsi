@@ -10,6 +10,23 @@
 / {
 	compatible = "phytium,pe2204";
 
+	reserved-memory {
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+
+		rproc: rproc@b0100000 {
+			no-map;
+			reg = <0x0 0xb0100000 0x0 0x19900000>;
+		};
+	};
+
+	remoteproc: remoteproc@0 {
+		compatible = "phytium,rproc";
+		memory-region = <&rproc>;
+		status = "disabled";
+	};
+
 	aliases {
 		ethernet0 = &macb0;
 		ethernet1 = &macb1;
@@ -49,12 +66,6 @@
 		reg = <0x0 0x200>;
 		enable-method = "psci";
 		clocks = <&scmi_dvfs 2>;
-
-		i-cache-size = <0x8000>;
-		i-cache-line-size = <64>;
-		d-cache-size = <0x8000>;
-		d-cache-line-size = <64>;
-		next-level-cache = <&l2_cache_l>;
 	};
 
 	cpu_l1: cpu@1 {
@@ -63,22 +74,7 @@
 		reg = <0x0 0x201>;
 		enable-method = "psci";
 		clocks = <&scmi_dvfs 2>;
-
-		i-cache-size = <0x8000>;
-		i-cache-line-size = <64>;
-		d-cache-size = <0x8000>;
-		d-cache-line-size = <64>;
-		next-level-cache = <&l2_cache_l>;
 	};
-
-	l2_cache_l: l2-cache {
-		compatible = "cache";
-		cache-level = <2>;
-		cache-unified;
-		cache-size = <0x40000>;
-		cache-line-size = <64>;
-		cache-sets = <16>;
-    };
 
 	cpu_b0: cpu@100 {
 		device_type = "cpu";
@@ -86,12 +82,6 @@
 		reg = <0x0 0x0>;
 		enable-method = "psci";
 		clocks = <&scmi_dvfs 0>;
-
-		i-cache-size = <0xc000>;
-		i-cache-line-size = <64>;
-		d-cache-size = <0x8000>;
-		d-cache-line-size = <64>;
-		next-level-cache = <&l2_cache_b>;
 	};
 
 	cpu_b1: cpu@101 {
@@ -100,22 +90,7 @@
 		reg = <0x0 0x100>;
 		enable-method = "psci";
 		clocks = <&scmi_dvfs 1>;
-
-		i-cache-size = <0xc000>;
-		i-cache-line-size = <64>;
-		d-cache-size = <0x8000>;
-		d-cache-line-size = <64>;
-		next-level-cache = <&l2_cache_b>;
 	};
-
-	l2_cache_b: l2-cache {
-		compatible = "cache";
-		cache-level = <2>;
-		cache-unified;
-		cache-size = <0x100000>;
-		cache-line-size = <64>;
-		cache-sets = <16>;
-    };
 };
 
 &soc {
