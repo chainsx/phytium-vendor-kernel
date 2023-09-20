@@ -1084,6 +1084,7 @@ static int macb_phylink_connect(struct macb *bp)
 			netdev_err(dev, "no PHY found\n");
 			return -ENXIO;
 		}
+		phydev->force_mode = bp->force_phy_mode;
 
 		/* attach the mac to the phy */
 		ret = phylink_connect_phy(bp->phylink, phydev);
@@ -1141,6 +1142,7 @@ static int macb_mii_probe(struct net_device *dev)
 
 	bp->phylink = phylink_create(&bp->phylink_config, bp->pdev->dev.fwnode,
 				     bp->phy_interface, &macb_phylink_ops);
+
 	if (IS_ERR(bp->phylink)) {
 		netdev_err(dev, "Could not create a phylink instance (%ld)\n",
 			   PTR_ERR(bp->phylink));
@@ -4937,7 +4939,7 @@ static const struct macb_config phytium_gem1p0_config = {
 	.dma_burst_length = 16,
 	.clk_init = macb_clk_init,
 	.init = macb_init,
-	.jumbo_max_len = 10240,
+	.jumbo_max_len = 16360,
 	.sel_clk_hw = phytium_gem1p0_sel_clk,
 };
 
@@ -5189,6 +5191,10 @@ static int macb_probe(struct platform_device *pdev)
 	err = init(pdev);
 	if (err)
 		goto err_out_free_netdev;
+
+	if (device_property_read_bool(&pdev->dev, "force-phy-mode")) {
+		bp->force_phy_mode = 1;
+	}
 
 	err = macb_mii_init(bp);
 	if (err)
