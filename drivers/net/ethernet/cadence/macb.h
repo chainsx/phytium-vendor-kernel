@@ -79,6 +79,7 @@
 #define MACB_RBQPH		0x04D4
 
 /* GEM register offsets. */
+#define GEM_NCR			0x0000 /* Network Control */
 #define GEM_NCFGR		0x0004 /* Network Config */
 #define GEM_USRIO		0x000c /* User IO */
 #define GEM_DMACFG		0x0010 /* DMA Configuration */
@@ -260,6 +261,12 @@
 #define MACB_SRTSM_OFFSET	15
 #define MACB_OSSMODE_OFFSET 24 /* Enable One Step Synchro Mode */
 #define MACB_OSSMODE_SIZE	1
+#define MACB_2PT5G_OFFSET	29 /* 2.5G operation selected */
+#define MACB_2PT5G_SIZE		1
+
+/* GEM specific NCR bitfields. */
+#define GEM_ENABLE_HS_MAC_OFFSET 31 /* Use high speed MAC */
+#define GEM_ENABLE_HS_MAC_SIZE	1
 
 /* Bitfields in NCFGR */
 #define MACB_SPD_OFFSET		0 /* Speed */
@@ -538,6 +545,8 @@
 #define GEM_RX_SCR_BYPASS_SIZE			1
 #define GEM_TX_SCR_BYPASS_OFFSET		8
 #define GEM_TX_SCR_BYPASS_SIZE			1
+#define GEM_RX_SYNC_RESET_OFFSET		2
+#define GEM_RX_SYNC_RESET_SIZE			1
 #define GEM_TX_EN_OFFSET			1
 #define GEM_TX_EN_SIZE				1
 #define GEM_SIGNAL_OK_OFFSET			0
@@ -1139,6 +1148,7 @@ struct macb_config {
 			    struct clk **rx_clk, struct clk **tsu_clk);
 	int	(*init)(struct platform_device *pdev);
 	int	jumbo_max_len;
+	void (*sel_clk_hw)(struct macb *bp);
 };
 
 struct tsu_incr {
@@ -1274,6 +1284,9 @@ struct macb {
 	int	tx_bd_rd_prefetch;
 
 	u32	rx_intr_mask;
+
+	/* PHYTIUM  sel clk */
+	void (*sel_clk_hw)(struct macb *bp);
 };
 
 #ifdef CONFIG_MACB_USE_HWSTAMP
