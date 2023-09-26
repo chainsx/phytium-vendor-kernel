@@ -1292,6 +1292,7 @@ struct macb {
 	int			duplex;
 	int			use_ncsi;
 
+	int 		force_phy_mode;
 	u32			caps;
 	unsigned int		dma_burst_length;
 
