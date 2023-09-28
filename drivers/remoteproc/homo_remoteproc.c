@@ -17,6 +17,7 @@
 #include <linux/remoteproc.h>
 #include <linux/psci.h>
 #include <linux/cpu.h>
+#include <linux/cpuhotplug.h>
 
 #include "remoteproc_internal.h"
 
@@ -56,6 +57,7 @@ struct homo_rproc {
 	int cpu;
 };
 
+static int homo_rproc_irq;
 static struct homo_rproc *g_priv;
 static struct work_struct workqueue;
 
@@ -188,6 +190,18 @@ static irqreturn_t homo_rproc_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static int homo_rproc_starting_cpu(unsigned int cpu)
+{
+	enable_percpu_irq(homo_rproc_irq, irq_get_trigger_type(homo_rproc_irq));
+	return 0;
+}
+
+static int homo_rproc_dying_cpu(unsigned int cpu)
+{
+	disable_percpu_irq(homo_rproc_irq);
+	return 0;
+}
+
 static int homo_rproc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -199,7 +213,6 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	struct homo_rproc *priv;
 	int ret;
 	unsigned int ipi, cpu;
-	int irq;
 	struct of_phandle_args oirq;
 
 	ret = rproc_of_parse_firmware(dev, 0, &fw_name);
@@ -266,29 +279,43 @@ static int homo_rproc_probe(struct platform_device *pdev)
 
 	/* Look for the interrupt parent. */
 	p = of_irq_find_parent(np);
-	if (p == NULL)
-		return -EINVAL;
+	if (p == NULL) {
+		ret = -EINVAL;
+		goto err;
+	}
 
 	oirq.np = p;
 	oirq.args_count = 1;
 	oirq.args[0] = ipi;
-	irq = irq_create_of_mapping(&oirq);
-
-	ret = request_percpu_irq(irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
-	if (ret) {
-		dev_err(dev, "failed to request percpu irq, status = %d\n", ret);
-		return ret;
+	homo_rproc_irq = irq_create_of_mapping(&oirq);
+	if (homo_rproc_irq <= 0) {
+		ret = -EINVAL;
+		goto err;
 	}
 
-	enable_percpu_irq(irq, IRQ_TYPE_NONE);
+	ret = request_percpu_irq(homo_rproc_irq, homo_rproc_irq_handler, "homo-rproc-ipi", &cpu_number);
+	if (ret) {
+		dev_err(dev, "failed to request percpu irq, status = %d\n", ret);
+		goto err;
+	}
+
+	ret = cpuhp_setup_state(CPUHP_AP_HOMO_RPROC_STARTING, "remoteproc/homo_rproc:starting", homo_rproc_starting_cpu, homo_rproc_dying_cpu);
+	if (ret) {
+		dev_err(dev, "cpuhp setup state failed, status = %d\n", ret);
+		goto err;
+	}
 
 	ret = rproc_add(rproc);
 	if (ret) {
 		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n", ret);
-		return ret;
+		goto err;
 	}
 
 	return 0;
+
+err:
+	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
+	return ret;
 }
 
 static int homo_rproc_remove(struct platform_device *pdev)
