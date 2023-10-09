@@ -244,4 +244,3 @@
 &rng0 {
 	status = "okay";
 };
-
