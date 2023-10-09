@@ -288,6 +288,12 @@ config TI_K3_R5_REMOTEPROC
 	  It's safe to say N here if you're not interested in utilizing
 	  a slave processor.
 
+config HOMO_REMOTEPROC
+	bool "homogeneous remoteproc support"
+	select RPMSG_VIRTIO
+	help
+	  Say y here to support homogeneous processors via the remote processor framework.
+
 endif # REMOTEPROC
 
 endmenu
