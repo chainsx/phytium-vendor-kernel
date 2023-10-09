@@ -9,6 +9,7 @@
 
 /dts-v1/;
 /memreserve/ 0x80000000 0x10000;
+/memreserve/ 0xf4000000 0x4000000;
 
 #include "pe2204.dtsi"
 
@@ -213,6 +214,8 @@
 };
 
 &dc0 {
+        reg = <0x0 0x32000000 0x0 0x8000>,
+              <0x0 0xf4000000 0x0 0x4000000>; // (optional)
 	pipe_mask = [03];
 	edp_mask = [00];
 	status = "okay";
