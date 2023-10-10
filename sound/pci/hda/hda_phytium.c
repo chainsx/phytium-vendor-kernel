@@ -833,9 +833,6 @@ static int azx_first_init(struct azx *chip)
 
 	bus->cmd_resend = 1;
 
-	if (azx_acquire_irq(chip, 0) < 0)
-		return -EBUSY;
-
 	synchronize_irq(bus->irq);
 
 	gcap = azx_readw(chip, GCAP);
@@ -898,6 +895,9 @@ static int azx_first_init(struct azx *chip)
 		dev_err(card->dev, "no codecs found!\n");
 		return -ENODEV;
 	}
+
+	if (azx_acquire_irq(chip, 0) < 0)
+		return -EBUSY;
 
 	strcpy(card->driver, "ft-hda");
 	strcpy(card->shortname, "ft-hda");
