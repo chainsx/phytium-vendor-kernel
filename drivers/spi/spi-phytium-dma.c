@@ -514,3 +514,5 @@ void phytium_spi_dmaops_set(struct phytium_spi *fts)
 	fts->dma_ops = &phytium_spi_dma_generic_ops;
 }
 EXPORT_SYMBOL_GPL(phytium_spi_dmaops_set);
+
+MODULE_LICENSE("GPL v2");
