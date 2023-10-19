@@ -94,6 +94,7 @@ struct sifive_fu540_macb_mgmt {
 #define HS_SPEED_2500M			2
 #define HS_SPEED_5000M			3
 #define HS_SPEED_10000M			4
+#define MACB_SERDES_RATE_5G		0
 #define MACB_SERDES_RATE_10G		1
 
 /* Graceful stop timeouts in us. We should allow up to
@@ -572,31 +573,45 @@ static int phytium_gem_sel_clk(struct macb *bp, int spd)
 {
 	int speed = 0;
 
-	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
-		if (spd == SPEED_10000) {
-			gem_writel(bp, SRC_SEL_LN, 0x1);
+	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_10GBASER) {
+		gem_writel(bp, SRC_SEL_LN, 0x1);
+		if (spd == SPEED_5000) {
+			gem_writel(bp, DIV_SEL0_LN, 0x8);
+			gem_writel(bp, DIV_SEL1_LN, 0x2);
+			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x0);
+			speed = HS_SPEED_5000M;
+		} else {
 			gem_writel(bp, DIV_SEL0_LN, 0x4);
 			gem_writel(bp, DIV_SEL1_LN, 0x1);
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
 			speed = HS_SPEED_10000M;
 		}
+	} else if (bp->phy_interface ==  PHY_INTERFACE_MODE_5GBASER) {
+		gem_writel(bp, SRC_SEL_LN, 0x1);
+		gem_writel(bp, DIV_SEL0_LN, 0x8);
+		gem_writel(bp, DIV_SEL1_LN, 0x2);
+		gem_writel(bp, PMA_XCVR_POWER_STATE, 0x0);
+		speed = HS_SPEED_5000M;
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		gem_writel(bp, SRC_SEL_LN, 0x1);
+		gem_writel(bp, DIV_SEL0_LN, 0x1);
+		gem_writel(bp, DIV_SEL1_LN, 0x2);
+		gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
+		gem_writel(bp, TX_CLK_SEL0, 0x0);
+		gem_writel(bp, TX_CLK_SEL1, 0x1);
+		gem_writel(bp, TX_CLK_SEL2, 0x1);
+		gem_writel(bp, TX_CLK_SEL3, 0x1);
+		gem_writel(bp, RX_CLK_SEL0, 0x1);
+		gem_writel(bp, RX_CLK_SEL1, 0x0);
+		gem_writel(bp, TX_CLK_SEL3_0, 0x0);
+		gem_writel(bp, TX_CLK_SEL4_0, 0x0);
+		gem_writel(bp, RX_CLK_SEL3_0, 0x0);
+		gem_writel(bp, RX_CLK_SEL4_0, 0x0);
+		speed = HS_SPEED_2500M;
 	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-		if (spd == SPEED_2500) {
-			gem_writel(bp, DIV_SEL0_LN, 0x1);
-			gem_writel(bp, DIV_SEL1_LN, 0x2);
-			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
-			gem_writel(bp, TX_CLK_SEL0, 0x0);
-			gem_writel(bp, TX_CLK_SEL1, 0x1);
-			gem_writel(bp, TX_CLK_SEL2, 0x1);
-			gem_writel(bp, TX_CLK_SEL3, 0x1);
-			gem_writel(bp, RX_CLK_SEL0, 0x1);
-			gem_writel(bp, RX_CLK_SEL1, 0x0);
-			gem_writel(bp, TX_CLK_SEL3_0, 0x0);
-			gem_writel(bp, TX_CLK_SEL4_0, 0x0);
-			gem_writel(bp, RX_CLK_SEL3_0, 0x0);
-			gem_writel(bp, RX_CLK_SEL4_0, 0x0);
-			speed = HS_SPEED_2500M;
-		} else if (spd == SPEED_1000) {
+		if (spd == SPEED_1000) {
+			gem_writel(bp, SRC_SEL_LN, 0x1);
 			gem_writel(bp, DIV_SEL0_LN, 0x4);
 			gem_writel(bp, DIV_SEL1_LN, 0x8);
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
@@ -612,6 +627,7 @@ static int phytium_gem_sel_clk(struct macb *bp, int spd)
 			gem_writel(bp, RX_CLK_SEL4_0, 0x0);
 			speed = HS_SPEED_1000M;
 		} else if (spd == SPEED_100 || spd == SPEED_10) {
+			gem_writel(bp, SRC_SEL_LN, 0x1);
 			gem_writel(bp, DIV_SEL0_LN, 0x4);
 			gem_writel(bp, DIV_SEL1_LN, 0x8);
 			gem_writel(bp, PMA_XCVR_POWER_STATE, 0x1);
@@ -627,7 +643,8 @@ static int phytium_gem_sel_clk(struct macb *bp, int spd)
 			gem_writel(bp, RX_CLK_SEL4_0, 0x1);
 			speed = HS_SPEED_100M;
 		}
-	} else if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII) {
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+		   bp->phy_interface == PHY_INTERFACE_MODE_RGMII_ID) {
 		if (spd == SPEED_1000) {
 			gem_writel(bp, MII_SELECT, 0x1);
 			gem_writel(bp, SEL_MII_ON_RGMII, 0x0);
@@ -690,10 +707,24 @@ static void macb_usx_pcs_link_up(struct phylink_pcs *pcs, unsigned int neg_mode,
 	u32 config;
 
 	config = gem_readl(bp, USX_CONTROL);
-	config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, config);
-	config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, config);
+	if (speed == SPEED_10000) {
+		config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, config);
+		config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, config);
+	} else if (speed == SPEED_5000) {
+		config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_5G, config);
+		config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_5000M, config);
+	}
+
 	config &= ~(GEM_BIT(TX_SCR_BYPASS) | GEM_BIT(RX_SCR_BYPASS));
-	config |= GEM_BIT(TX_EN);
+
+	config &= ~(GEM_BIT(SIGNAL_OK) | GEM_BIT(TX_EN));
+	config |= GEM_BIT(RX_SYNC_RESET);
+
+	gem_writel(bp, USX_CONTROL, config);
+
+	config &= ~(GEM_BIT(RX_SYNC_RESET));
+	config |= GEM_BIT(SIGNAL_OK) | GEM_BIT(TX_EN);
+
 	gem_writel(bp, USX_CONTROL, config);
 }
 
@@ -703,7 +734,11 @@ static void macb_usx_pcs_get_state(struct phylink_pcs *pcs,
 	struct macb *bp = container_of(pcs, struct macb, phylink_usx_pcs);
 	u32 val;
 
-	state->speed = SPEED_10000;
+	if (state->interface == PHY_INTERFACE_MODE_5GBASER)
+		state->speed = SPEED_5000;
+	else
+		state->speed = SPEED_10000;
+
 	state->duplex = 1;
 	state->an_complete = 1;
 
@@ -781,9 +816,12 @@ static void macb_mac_config(struct phylink_config *config, unsigned int mode,
 		ctrl &= ~(GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL));
 		ncr &= ~GEM_BIT(ENABLE_HS_MAC);
 
-		if (state->interface == PHY_INTERFACE_MODE_SGMII) {
+		if (state->interface == PHY_INTERFACE_MODE_SGMII ||
+		    state->interface == PHY_INTERFACE_MODE_2500BASEX) {
 			ctrl |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL);
-		} else if (state->interface == PHY_INTERFACE_MODE_10GBASER) {
+		} else if (state->interface == PHY_INTERFACE_MODE_10GBASER ||
+			   state->interface == PHY_INTERFACE_MODE_USXGMII ||
+			   state->interface == PHY_INTERFACE_MODE_5GBASER) {
 			ctrl |= GEM_BIT(PCSSEL);
 			ncr |= GEM_BIT(ENABLE_HS_MAC);
 		} else if (bp->caps & MACB_CAPS_MIIONRGMII &&
@@ -803,7 +841,8 @@ static void macb_mac_config(struct phylink_config *config, unsigned int mode,
 	 * Must be written after PCSSEL is set in NCFGR,
 	 * otherwise writes will not take effect.
 	 */
-	if (macb_is_gem(bp) && state->interface == PHY_INTERFACE_MODE_SGMII) {
+	if (macb_is_gem(bp) && state->interface == (PHY_INTERFACE_MODE_SGMII ||
+						    PHY_INTERFACE_MODE_2500BASEX)) {
 		u32 pcsctrl, old_pcsctrl;
 
 		old_pcsctrl = gem_readl(bp, PCSCNTRL);
@@ -833,7 +872,7 @@ static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
 				     bp->rx_intr_mask | MACB_TX_INT_FLAGS | MACB_BIT(HRESP));
 
 	/* Disable Rx and Tx */
-	ctrl = macb_readl(bp, NCR) & ~(MACB_BIT(RE) | MACB_BIT(TE));
+	ctrl = macb_readl(bp, NCR) & ~(MACB_BIT(RE) | MACB_BIT(TE)) & ~(MACB_BIT(2PT5G));
 	macb_writel(bp, NCR, ctrl);
 
 	netif_tx_stop_all_queues(ndev);
@@ -854,6 +893,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 
 	spin_lock_irqsave(&bp->lock, flags);
 
+	if (bp->caps & MACB_CAPS_SEL_CLK_HW)
+		phytium_gem_sel_clk(bp, speed);
+
 	ctrl = macb_or_gem_readl(bp, NCFGR);
 
 	ctrl &= ~(MACB_BIT(SPD) | MACB_BIT(FD));
@@ -869,7 +911,7 @@ static void macb_mac_link_up(struct phylink_config *config,
 		if (macb_is_gem(bp)) {
 			ctrl &= ~GEM_BIT(GBE);
 
-			if (speed == SPEED_1000)
+			if (speed == SPEED_1000 || speed == SPEED_2500)
 				ctrl |= GEM_BIT(GBE);
 		}
 
@@ -889,17 +931,27 @@ static void macb_mac_link_up(struct phylink_config *config,
 
 	macb_or_gem_writel(bp, NCFGR, ctrl);
 
-	if (bp->phy_interface == PHY_INTERFACE_MODE_10GBASER)
-		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_10000M,
+	if (speed == SPEED_2500)
+		macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(2PT5G));
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_10GBASER ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
+		if (speed == SPEED_5000)
+			gem_writel(bp, HS_MAC_CONFIG,
+				   GEM_BFINS(HS_MAC_SPEED, HS_SPEED_5000M,
+					     gem_readl(bp, HS_MAC_CONFIG)));
+		else
+			gem_writel(bp, HS_MAC_CONFIG,
+				   GEM_BFINS(HS_MAC_SPEED, HS_SPEED_10000M,
+					     gem_readl(bp, HS_MAC_CONFIG)));
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_5GBASER)
+		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_5000M,
 							gem_readl(bp, HS_MAC_CONFIG)));
 
 	spin_unlock_irqrestore(&bp->lock, flags);
 
 	if (!(bp->caps & MACB_CAPS_MACB_IS_EMAC))
 		macb_set_tx_clk(bp, speed);
-
-	if (bp->caps & MACB_CAPS_SEL_CLK_HW)
-		phytium_gem_sel_clk(bp, speed);
 
 	/* Enable Rx and Tx; Enable PTP unicast */
 	ctrl = macb_readl(bp, NCR);
@@ -917,12 +969,16 @@ static struct phylink_pcs *macb_mac_select_pcs(struct phylink_config *config,
 	struct net_device *ndev = to_net_dev(config->dev);
 	struct macb *bp = netdev_priv(ndev);
 
-	if (interface == PHY_INTERFACE_MODE_10GBASER)
+	if (interface == PHY_INTERFACE_MODE_10GBASER ||
+	    interface == PHY_INTERFACE_MODE_5GBASER ||
+		interface == PHY_INTERFACE_MODE_USXGMII) {
 		return &bp->phylink_usx_pcs;
-	else if (interface == PHY_INTERFACE_MODE_SGMII)
+	} else if (interface == PHY_INTERFACE_MODE_SGMII ||
+		interface == PHY_INTERFACE_MODE_2500BASEX) {
 		return &bp->phylink_sgmii_pcs;
-	else
+	} else {
 		return NULL;
+	}
 }
 
 static const struct phylink_mac_ops macb_phylink_ops = {
@@ -979,6 +1035,20 @@ static void macb_get_pcs_fixed_state(struct phylink_config *config,
 	state->link = (macb_readl(bp, NSR) & MACB_BIT(NSR_LINK)) != 0;
 }
 
+static void macb_get_usx_pcs_fixed_state(struct phylink_config *config,
+					 struct phylink_link_state *state)
+{
+	u32 val;
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct macb *bp = netdev_priv(ndev);
+
+	val = gem_readl(bp, USX_STATUS);
+	state->link = !!(val & GEM_BIT(USX_BLOCK_LOCK));
+	val = gem_readl(bp, NCFGR);
+	if (val & GEM_BIT(PAE))
+		state->pause = MLO_PAUSE_RX;
+}
+
 /* based on au1000_eth. c*/
 static int macb_mii_probe(struct net_device *dev)
 {
@@ -996,6 +1066,10 @@ static int macb_mii_probe(struct net_device *dev)
 	if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		bp->phylink_config.poll_fixed_state = true;
 		bp->phylink_config.get_fixed_state = macb_get_pcs_fixed_state;
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX ||
+			bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
+		bp->phylink_config.poll_fixed_state = true;
+		bp->phylink_config.get_fixed_state = macb_get_usx_pcs_fixed_state;
 	}
 
 	bp->phylink_config.mac_capabilities = MAC_ASYM_PAUSE |
@@ -1023,8 +1097,16 @@ static int macb_mii_probe(struct net_device *dev)
 		if (bp->caps & MACB_CAPS_HIGH_SPEED) {
 			__set_bit(PHY_INTERFACE_MODE_10GBASER,
 				  bp->phylink_config.supported_interfaces);
+			__set_bit(PHY_INTERFACE_MODE_USXGMII,
+				  bp->phylink_config.supported_interfaces);
 			bp->phylink_config.mac_capabilities |= MAC_10000FD;
 		}
+	}
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		bp->phylink_config.poll_fixed_state = true;
+		bp->phylink_config.get_fixed_state = macb_get_pcs_fixed_state;
 	}
 
 	bp->phylink = phylink_create(&bp->phylink_config, bp->pdev->dev.fwnode,
@@ -2921,6 +3003,8 @@ static void macb_init_hw(struct macb *bp)
 	bp->rx_frm_len_mask = MACB_RX_FRMLEN_MASK;
 	if (bp->caps & MACB_CAPS_JUMBO)
 		bp->rx_frm_len_mask = MACB_RX_JFRMLEN_MASK;
+
+	gem_writel(bp, AXI_PIPE, 0x1010);
 
 	macb_configure_dma(bp);
 

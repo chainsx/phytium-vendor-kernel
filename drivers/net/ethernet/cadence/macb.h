@@ -85,6 +85,7 @@
 #define GEM_PBUFRXCUT		0x0044 /* RX Partial Store and Forward */
 #define GEM_JML			0x0048 /* Jumbo Max Length */
 #define GEM_HS_MAC_CONFIG	0x0050 /* GEM high speed config */
+#define GEM_AXI_PIPE		0x0054 /* AXI max pipeline register*/
 #define GEM_HRB			0x0080 /* Hash Bottom */
 #define GEM_HRT			0x0084 /* Hash Top */
 #define GEM_SA1B		0x0088 /* Specific1 Bottom */
@@ -279,6 +280,8 @@
 #define MACB_OSSMODE_SIZE	1
 #define MACB_MIIONRGMII_OFFSET	28 /* MII Usage on RGMII Interface */
 #define MACB_MIIONRGMII_SIZE	1
+#define MACB_2PT5G_OFFSET	29 /* 2.5G operation selected */
+#define MACB_2PT5G_SIZE		1
 
 /* Bitfields in NCFGR */
 #define MACB_SPD_OFFSET		0 /* Speed */
@@ -587,6 +590,8 @@
 #define GEM_RX_SCR_BYPASS_SIZE			1
 #define GEM_TX_SCR_BYPASS_OFFSET		8
 #define GEM_TX_SCR_BYPASS_SIZE			1
+#define GEM_RX_SYNC_RESET_OFFSET		2
+#define GEM_RX_SYNC_RESET_SIZE			1
 #define GEM_TX_EN_OFFSET			1
 #define GEM_TX_EN_SIZE				1
 #define GEM_SIGNAL_OK_OFFSET			0
