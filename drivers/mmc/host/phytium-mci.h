@@ -344,7 +344,12 @@ struct phytium_mci_host {
 	unsigned long irq_flags;
 	unsigned long flags;
 #define MCI_CARD_NEED_INIT	1
-
+	bool use_hold;	/*use hold reg*/
+	bool clk_set;	/*clock set function enable*/
+	s32 clk_smpl_drv_25m;	/*25M clk smpl & drv*/
+	s32 clk_smpl_drv_50m;	/*50M clk smpl & drv*/
+	s32 clk_smpl_drv_66m;	/*66M clk smpl & drv*/
+	s32 clk_smpl_drv_100m;	/*100M clk smpl & drv*/
 };
 
 int phytium_mci_common_probe(struct phytium_mci_host *host);

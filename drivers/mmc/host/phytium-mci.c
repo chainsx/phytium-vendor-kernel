@@ -195,16 +195,35 @@ static void phytium_mci_set_clk(struct phytium_mci_host *host, struct mmc_ios *i
 		clk_rate = host->clk_rate;
 		first_uhs_div = 1 + ((tmp_ext_reg >> 8)&0xFF);
 		div = clk_rate / (2 * first_uhs_div * ios->clock);
-		if (div > 2) {
-			sample = div / 2 + 1;
-			drv = sample - 1;
-			writel((sample << 16) | (drv << 8) | (div & 0xff),
-			       host->base + MCI_CLKDIV);
-		} else if (div == 2) {
-			drv = 0;
-			sample = 1;
-			writel((drv << 8) | (sample << 16) | (div & 0xff),
-			       host->base + MCI_CLKDIV);
+
+		if (host->clk_smpl_drv_25m >= 0
+			&& ios->clock == 25000000 && host->clk_set) {
+			writel((host->clk_smpl_drv_25m << 8) | (div & 0xff),
+					host->base + MCI_CLKDIV);
+		} else if (host->clk_smpl_drv_50m >= 0
+			&& ios->clock == 50000000 && host->clk_set){
+			writel((host->clk_smpl_drv_50m << 8) | (div & 0xff),
+					host->base + MCI_CLKDIV);
+		} else if (host->clk_smpl_drv_66m >= 0
+			&& ios->clock == 66000000 && host->clk_set){
+			writel((host->clk_smpl_drv_66m << 8) | (div & 0xff),
+					host->base + MCI_CLKDIV);
+		} else if (host->clk_smpl_drv_100m >= 0
+			&& ios->clock == 100000000 && host->clk_set){
+			writel((host->clk_smpl_drv_100m << 8) | (div & 0xff),
+					host->base + MCI_CLKDIV);
+		} else {
+			if (div > 2) {
+				sample = div / 2 + 1;
+				drv = sample - 1;
+				writel((sample << 16) | (drv << 8) | (div & 0xff),
+						host->base + MCI_CLKDIV);
+			} else if (div == 2) {
+				drv = 0;
+				sample = 1;
+				writel((drv << 8) | (sample << 16) | (div & 0xff),
+						host->base + MCI_CLKDIV);
+			}
 		}
 
 		dev_dbg(host->dev, "UHS_REG_EXT ext: %x, CLKDIV: %x\n",
@@ -292,6 +311,9 @@ u32 phytium_mci_cmd_prepare_raw_cmd(struct phytium_mci_host *host,
 		if (data->flags & MMC_DATA_WRITE)
 			rawcmd |= (0x1 << 10);
 	}
+
+	if (host->use_hold)
+		rawcmd |= (0x1 << 29);
 
 	return (rawcmd | (0x1 << 31));
 }

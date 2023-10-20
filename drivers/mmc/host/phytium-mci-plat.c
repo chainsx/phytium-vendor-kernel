@@ -45,6 +45,26 @@ static int phytium_mci_probe(struct platform_device *pdev)
 	if (ret)
 		goto host_free;
 
+	if (device_property_read_bool(dev, "use-hold"))
+		host->use_hold = 1;
+
+	if (device_property_read_bool(dev, "clk-set"))
+		host->clk_set = 1;
+
+	if (host->clk_set) {
+		host->clk_smpl_drv_25m = -1;
+		host->clk_smpl_drv_50m = -1;
+		host->clk_smpl_drv_66m = -1;
+		host->clk_smpl_drv_100m = -1;
+		device_property_read_u32(dev, "clk-smpl-drv-25m", &host->clk_smpl_drv_25m);
+		device_property_read_u32(dev, "clk-smpl-drv-50m", &host->clk_smpl_drv_50m);
+		device_property_read_u32(dev, "clk-smpl-drv-66m", &host->clk_smpl_drv_66m);
+		device_property_read_u32(dev, "clk-smpl-drv-100m", &host->clk_smpl_drv_100m);
+	}
+	dev_info(dev, "mci clk set %d %d 0x%x 0x%x 0x%x 0x%x\n",
+			host->use_hold, host->clk_set, host->clk_smpl_drv_25m,
+			host->clk_smpl_drv_50m, host->clk_smpl_drv_66m, host->clk_smpl_drv_100m);
+
 	if (dev->of_node) {
 		host->src_clk = devm_clk_get(&pdev->dev, "phytium_mci_clk");
 		if (IS_ERR(host->src_clk)) {
