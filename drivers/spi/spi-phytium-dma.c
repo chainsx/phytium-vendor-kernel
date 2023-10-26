@@ -13,6 +13,7 @@
 #include <linux/spi/spi.h>
 #include <linux/types.h>
 #include <linux/delay.h>
+#include <linux/module.h>
 #include "spi-phytium.h"
 
 #define RX_BUSY		0
