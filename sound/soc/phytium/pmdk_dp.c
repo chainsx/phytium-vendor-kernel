@@ -166,7 +166,7 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 	struct pmdk_dp_private *priv;
 	struct snd_soc_dai_link *pmdk_dai;
 	int num_dp = 2;
-	char dp_mask;
+	char dp_mask = 0x7;
 	int i,j = 0;
 	card->dev = &pdev->dev;
 
