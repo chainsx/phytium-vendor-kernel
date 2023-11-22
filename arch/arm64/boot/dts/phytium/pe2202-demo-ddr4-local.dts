@@ -110,10 +110,15 @@
 };
 
 &spi2 {
+	dmas = <&ddma0 0 8>,
+	       <&ddma0 1 21>;
+	dma-names = "tx", "rx";
 	status = "okay";
 };
 
 &uart1 {
+	dmas = <&ddma0 2 3>;
+	dma-names = "tx";
 	status = "okay";
 };
 
