@@ -241,12 +241,13 @@ static int phytium_spi_transfer_one(struct spi_master *master,
 
 	spi_enable_chip(fts, 0);
 
-	if (transfer->speed_hz != chip->speed_hz) {
-		clk_div = (fts->max_freq / transfer->speed_hz + 1) & 0xfffe;
-
-		chip->speed_hz = transfer->speed_hz;
-		chip->clk_div = clk_div;
-
+	if (transfer->speed_hz != fts->current_freq) {
+		if (transfer->speed_hz != chip->speed_hz) {
+			clk_div = (fts->max_freq / transfer->speed_hz + 1) & 0xfffe;
+			chip->speed_hz = transfer->speed_hz;
+			chip->clk_div = clk_div;
+		}
+		fts->current_freq = transfer->speed_hz;
 		spi_set_clk(fts, chip->clk_div);
 	}
 

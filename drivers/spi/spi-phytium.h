@@ -98,6 +98,7 @@ struct phytium_spi {
 	struct clk		*clk;
 	irqreturn_t		(*transfer_handler)(struct phytium_spi *fts);
 
+	u32			current_freq; /* frequency in hz */
 	struct dma_chan		*txchan;
 	u32			txburst;
 	struct dma_chan		*rxchan;
@@ -202,6 +203,7 @@ static inline void spi_shutdown_chip(struct phytium_spi *fts)
 {
 	spi_enable_chip(fts, 0);
 	spi_set_clk(fts, 0);
+	fts->current_freq = 0;
 }
 
 extern int phytium_spi_add_host(struct device *dev, struct phytium_spi *fts);
