@@ -251,6 +251,22 @@
 			status = "disabled";
 		};
 
+		ddma0: dma-controller@28003000 {
+			compatible = "phytium,ddma";
+			reg = <0x0 0x28003000 0x0 0x1000>;
+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <2>;
+			dma-channels = <8>;
+		};
+
+		ddma1: dma-controller@28004000 {
+			compatible = "phytium,ddma";
+			reg = <0x0 0x28004000 0x0 0x1000>;
+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <2>;
+			dma-channels = <8>;
+		};
+
 		lpc: lpc@28010000 {
 			compatible = "simple-mfd", "syscon";
 			reg = <0x0 0x28010000 0x0 0x1000>;
