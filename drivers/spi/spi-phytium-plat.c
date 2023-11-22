@@ -57,6 +57,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	fts->paddr = mem->start;
 	fts->regs = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(fts->regs)) {
 		dev_err(&pdev->dev, "SPI region map failed\n");
@@ -94,6 +95,12 @@ static int phytium_spi_probe(struct platform_device *pdev)
 
 	device_property_read_u32(&pdev->dev, "global-cs", &global_cs);
 	fts->global_cs = global_cs;
+
+	if ((device_property_read_string_array(&pdev->dev, "dma-names", NULL, 0) > 0) &&
+	    device_property_present(&pdev->dev, "dmas")) {
+		fts->dma_en = true;
+		phytium_spi_dmaops_set(fts);
+	}
 
 	ret = phytium_spi_add_host(&pdev->dev, fts);
 	if (ret)
