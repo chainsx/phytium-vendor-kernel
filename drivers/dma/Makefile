@@ -60,6 +60,7 @@ obj-$(CONFIG_MXS_DMA) += mxs-dma.o
 obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
 obj-$(CONFIG_OWL_DMA) += owl-dma.o
 obj-$(CONFIG_PCH_DMA) += pch_dma.o
+obj-$(CONFIG_PHYTIUM_DDMA) += phytium/
 obj-$(CONFIG_PL330_DMA) += pl330.o
 obj-$(CONFIG_PLX_DMA) += plx_dma.o
 obj-$(CONFIG_PPC_BESTCOMM) += bestcomm/
