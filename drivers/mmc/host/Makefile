@@ -69,6 +69,7 @@ obj-$(CONFIG_MMC_SUNXI)		+= sunxi-mmc.o
 obj-$(CONFIG_MMC_USDHI6ROL0)	+= usdhi6rol0.o
 obj-$(CONFIG_MMC_TOSHIBA_PCI)	+= toshsd.o
 obj-$(CONFIG_MMC_BCM2835)	+= bcm2835.o
+obj-$(CONFIG_MMC_PHYTIUM_SDCI)	+= phytium-sdci.o
 obj-$(CONFIG_MMC_PHYTIUM_MCI_PCI)	+= phytium-mci-pci.o phytium-mci.o
 obj-$(CONFIG_MMC_PHYTIUM_MCI_PLTFM)	+= phytium-mci-plat.o phytium-mci.o
 

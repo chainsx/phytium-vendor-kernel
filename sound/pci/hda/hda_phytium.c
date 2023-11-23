@@ -860,6 +860,8 @@ static int azx_first_init(struct azx *chip)
 		dma_set_coherent_mask(hddev, DMA_BIT_MASK(32));
 	}
 
+	hddev->archdata.dma_coherent = false;
+
 	/* read number of streams from GCAP register instead of using
 	 * hardcoded value
 	 */
