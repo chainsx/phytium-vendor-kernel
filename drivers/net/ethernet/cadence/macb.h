@@ -9,6 +9,7 @@
 
 #include <linux/clk.h>
 #include <linux/phylink.h>
+#include <linux/phy.h>
 #include <linux/ptp_clock_kernel.h>
 #include <linux/net_tstamp.h>
 #include <linux/interrupt.h>
@@ -16,6 +17,12 @@
 #if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) || defined(CONFIG_MACB_USE_HWSTAMP)
 #define MACB_EXT_DESC
 #endif
+
+enum irq_type {
+	IRQ_TYPE_INTX = 1,
+	IRQ_TYPE_MSI = 2,
+	IRQ_TYPE_MAX = 3,
+};
 
 #define MACB_GREGS_NBR 16
 #define MACB_GREGS_VERSION 2
@@ -173,6 +180,7 @@
 #define GEM_DCFG12		0x02AC /* Design Config 12 */
 #define GEM_USX_CONTROL		0x0A80 /* High speed PCS control register */
 #define GEM_USX_STATUS		0x0A88 /* High speed PCS status register */
+#define GEM_TAIL_ENABLE		0x0E7C /* Phytium: Enable tail */
 
 #define GEM_TXBDCTRL	0x04cc /* TX Buffer Descriptor control register */
 #define GEM_RXBDCTRL	0x04d0 /* RX Buffer Descriptor control register */
@@ -207,6 +215,7 @@
 #define GEM_IER(hw_q)		(0x0600 + ((hw_q) << 2))
 #define GEM_IDR(hw_q)		(0x0620 + ((hw_q) << 2))
 #define GEM_IMR(hw_q)		(0x0640 + ((hw_q) << 2))
+#define GEM_TAIL(hw_q)		(0x0e80 + ((hw_q) << 2)) /* Phytium: tail register */
 #define GEM_SRC_SEL_LN          0x1C04
 #define GEM_DIV_SEL0_LN         0x1C08
 #define GEM_DIV_SEL1_LN         0x1C0C
@@ -235,6 +244,8 @@
 #define GEM_PHY_INT_ENABLE        0x1C88
 #define GEM_PHY_INT_CLEAR         0x1C8C
 #define GEM_PHY_INT_STATE         0x1C90
+
+#define GEM_INTX_IRQ_MASK		  0x1C7C /* Phytium: irq mask */
 
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET		0 /* reserved */
@@ -738,6 +749,7 @@
 #define MACB_CAPS_BD_RD_PREFETCH		0x00000080
 #define MACB_CAPS_NEEDS_RSTONUBR		0x00000100
 #define MACB_CAPS_SEL_CLK			0x00000200
+#define MACB_CAPS_TAILPTR		0x00001000 /* Phytium: tail register */
 #define MACB_CAPS_CLK_HW_CHG			0x04000000
 #define MACB_CAPS_MACB_IS_EMAC			0x08000000
 #define MACB_CAPS_FIFO_MODE			0x10000000
@@ -1216,6 +1228,7 @@ struct macb_queue {
 	unsigned int		RBQS;
 	unsigned int		RBQP;
 	unsigned int		RBQPH;
+	unsigned int		TAILADDR;
 
 	unsigned int		tx_head, tx_tail;
 	struct macb_dma_desc	*tx_ring;
@@ -1394,6 +1407,24 @@ static inline bool gem_has_ptp(struct macb *bp)
 	return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
 }
 
+enum phytium_type {
+	PHYTIUM_DEV_1P0 = 1,
+	PHYTIUM_DEV_2P0,
+	PHYTIUM_DEV_3P0,
+};
+
+struct phytium_platform_pdata {
+	int			phytium_dev_type;
+	struct clk		*txclk;
+	struct clk		*rxclk;
+	struct clk		*tsu_clk;
+	u32			caps;
+	int			irq_type;
+	int			irq[4];
+	phy_interface_t		phy_interface;
+	const struct property_entry *properties;
+};
+
 /**
  * struct macb_platform_data - platform data for MACB Ethernet used for PCI registration
  * @pclk:		platform clock
@@ -1402,6 +1433,7 @@ static inline bool gem_has_ptp(struct macb *bp)
 struct macb_platform_data {
 	struct clk	*pclk;
 	struct clk	*hclk;
+	struct phytium_platform_pdata phytium_macb_pdata;
 };
 
 #endif /* _MACB_H */

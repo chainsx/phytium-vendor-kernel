@@ -754,7 +754,7 @@ static struct phytium_uart_port *uart_ports[UART_NR];
 static struct uart_driver phytium_uart = {
 	.owner		= THIS_MODULE,
 	.driver_name	= DRV_NAME,
-	.dev_name	= "ttyS",
+	.dev_name	= "ttyFTX",
 	.nr		= UART_NR,
 };
 
