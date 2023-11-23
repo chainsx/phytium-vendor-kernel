@@ -92,6 +92,10 @@
 #define AT803X_DEBUG_REG_5			0x05
 #define AT803X_DEBUG_TX_CLK_DLY_EN		BIT(8)
 
+#define AT803X_DEBUG_REG_B			0x0B
+#define AT803X_DEBUG_REG_B_HIBERNATION_ENABLE	0x1
+#define AT803X_DEBUG_REG_B_HIBERNATION_OFFSET	15
+
 #define AT803X_DEBUG_REG_1F			0x1F
 #define AT803X_DEBUG_PLL_ON			BIT(2)
 #define AT803X_DEBUG_RGMII_1V8			BIT(3)
@@ -200,6 +204,20 @@ static int at803x_enable_tx_delay(struct phy_device *phydev)
 {
 	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5, 0,
 				     AT803X_DEBUG_TX_CLK_DLY_EN);
+}
+
+static inline int at803x_disable_hibernate(struct phy_device *phydev)
+{
+	int ret = 0;
+	u16 val = 0;
+
+	ret = at803x_debug_reg_read(phydev, AT803X_DEBUG_REG_B);
+	if (ret < 0)
+		return ret;
+
+	val = ret & 0xffff;
+	val &= (~(AT803X_DEBUG_REG_B_HIBERNATION_ENABLE << AT803X_DEBUG_REG_B_HIBERNATION_OFFSET));
+	return phy_write(phydev, AT803X_DEBUG_DATA, val);
 }
 
 static int at803x_disable_rx_delay(struct phy_device *phydev)
@@ -562,6 +580,10 @@ static int at8031_pll_config(struct phy_device *phydev)
 static int at803x_config_init(struct phy_device *phydev)
 {
 	int ret;
+
+	ret = at803x_disable_hibernate(phydev);
+	if (ret < 0)
+		return ret;
 
 	/* The RX and TX delay default is:
 	 *   after HW reset: RX delay enabled and TX delay disabled

@@ -11,6 +11,7 @@
 #include <linux/pci.h>
 #include <linux/spi/spi.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include "spi-phytium.h"
 
 #define RX_BUSY		0
@@ -550,3 +551,5 @@ void phytium_spi_dmaops_set(struct phytium_spi *fts)
 	fts->dma_ops = &phytium_spi_dma_generic_ops;
 }
 EXPORT_SYMBOL_GPL(phytium_spi_dmaops_set);
+
+MODULE_LICENSE("GPL v2");

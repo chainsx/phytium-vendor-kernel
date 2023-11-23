@@ -992,7 +992,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c,
 	}
 	dev_dbg(&i2c->dev, "mic1-src %x", es8336->mic_src);
 
-	if (!es8336->spk_ctl_gpio)
+	if (IS_ERR_OR_NULL(es8336->spk_ctl_gpio))
 		dev_info(&i2c->dev, "Can not get spk_ctl_gpio\n");
 	else
 		es8336_enable_spk(es8336, false);
@@ -1000,7 +1000,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c,
 	es8336->hp_det_gpio = devm_gpiod_get_index_optional(&i2c->dev, "det", 0,
 							GPIOD_IN);
 
-	if (!es8336->hp_det_gpio) {
+	if (IS_ERR_OR_NULL(es8336->hp_det_gpio)) {
 		dev_info(&i2c->dev, "Can not get hp_det_gpio\n");
 	} else {
 		INIT_DELAYED_WORK(&es8336->work, hp_work);
