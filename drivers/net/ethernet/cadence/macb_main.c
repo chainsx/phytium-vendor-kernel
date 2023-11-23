@@ -935,6 +935,19 @@ static void phytium_gem2p0_sel_clk(struct macb *bp, int speed)
 							gem_readl(bp, HS_MAC_CONFIG)));
 }
 
+static void phytium_gem3p0_sel_clk(struct macb *bp, int speed)
+{
+	if (speed == SPEED_100 || speed == SPEED_10)
+		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_100M,
+							gem_readl(bp, HS_MAC_CONFIG)));
+	else if (speed == SPEED_1000)
+		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_1000M,
+							gem_readl(bp, HS_MAC_CONFIG)));
+	else if (speed == SPEED_2500)
+		gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, HS_SPEED_2500M,
+							gem_readl(bp, HS_MAC_CONFIG)));
+}
+
 static void macb_mac_link_up(struct phylink_config *config,
 			     struct phy_device *phy,
 			     unsigned int mode, phy_interface_t interface,
@@ -1073,7 +1086,13 @@ static int macb_phylink_connect(struct macb *bp)
 	struct device_node *dn = bp->pdev->dev.of_node;
 	struct net_device *dev = bp->dev;
 	struct phy_device *phydev;
+	struct macb_platform_data *pdata = dev_get_platdata(&bp->pdev->dev);
 	int ret;
+
+	if (pdata && pdata->phytium_macb_pdata.properties) {
+		phylink_start(bp->phylink);
+		return 0;
+	}
 
 	if (dn)
 		ret = phylink_of_phy_connect(bp->phylink, dn, 0);
@@ -1131,10 +1150,11 @@ static int macb_mii_probe(struct net_device *dev)
 	bp->phylink_config.dev = &dev->dev;
 	bp->phylink_config.type = PHYLINK_NETDEV;
 
-	if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+	if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII ||
+		bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
 		bp->phylink_config.poll_fixed_state = true;
 		bp->phylink_config.get_fixed_state = macb_get_pcs_fixed_state;
-	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX ||
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_10GBASER ||
 			bp->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
 		bp->phylink_config.poll_fixed_state = true;
 		bp->phylink_config.get_fixed_state = macb_get_usx_pcs_fixed_state;
@@ -2514,6 +2534,8 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	wmb();
 	skb_tx_timestamp(skb);
 
+	if (bp->caps & MACB_CAPS_TAILPTR)
+		queue_writel(queue, TAILADDR, BIT(31) | macb_tx_ring_wrap(bp, queue->tx_head));
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
 
 	if (CIRC_SPACE(queue->tx_head, queue->tx_tail, bp->tx_ring_size) < 1)
@@ -2710,6 +2732,9 @@ static void gem_init_rings(struct macb *bp)
 		desc->ctrl |= MACB_BIT(TX_WRAP);
 		queue->tx_head = 0;
 		queue->tx_tail = 0;
+
+		if (bp->caps & MACB_CAPS_TAILPTR)
+			queue_writel(queue, TAILADDR, BIT(31) | queue->tx_head);
 
 		queue->rx_tail = 0;
 		queue->rx_prepared_head = 0;
@@ -2948,6 +2973,8 @@ static void macb_init_hw(struct macb *bp)
 		bp->rx_frm_len_mask = MACB_RX_JFRMLEN_MASK;
 
 	gem_writel(bp, AXI_PIPE, 0x1010);
+	if (bp->caps & MACB_CAPS_TAILPTR)
+		gem_writel(bp, TAIL_ENABLE, 0x80000001);
 
 	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
 	    bp->phy_interface == PHY_INTERFACE_MODE_5GBASER ||
@@ -4030,9 +4057,14 @@ static void macb_configure_caps(struct macb *bp,
 				const struct macb_config *dt_conf)
 {
 	u32 dcfg;
+	struct macb_platform_data *pdata;
 
 	if (dt_conf)
 		bp->caps = dt_conf->caps;
+
+	pdata = dev_get_platdata(&bp->pdev->dev);
+	if (pdata && pdata->phytium_macb_pdata.phytium_dev_type == PHYTIUM_DEV_3P0)
+		bp->caps |= pdata->phytium_macb_pdata.caps;
 
 	if (hw_is_gem(bp->regs, bp->native_io)) {
 		bp->caps |= MACB_CAPS_MACB_IS_GEM;
@@ -4086,23 +4118,171 @@ static void macb_probe_queues(void __iomem *mem,
 	*num_queues = hweight32(*queue_mask);
 }
 
+#ifdef CONFIG_ACPI
+static int phytium_clk_acpi_init(struct platform_device *pdev, struct clk **pclk,
+				 struct clk **hclk, struct clk **tx_clk,
+				 struct clk **rx_clk, struct clk **tsu_clk)
+{
+	struct macb_platform_data *pdata;
+	int err;
+
+	pdata = dev_get_platdata(&pdev->dev);
+	if (pdata) {
+		*pclk = pdata->pclk;
+		*hclk = pdata->hclk;
+		*tx_clk = pdata->phytium_macb_pdata.txclk;
+		*rx_clk = pdata->phytium_macb_pdata.rxclk;
+		*tsu_clk = pdata->phytium_macb_pdata.tsu_clk;
+	} else {
+		*pclk = NULL;
+		*hclk = NULL;
+		*tx_clk = NULL;
+		*rx_clk = NULL;
+		*tsu_clk = NULL;
+	}
+
+	err = clk_prepare_enable(*pclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable pclk (%d)\n", err);
+		return err;
+	}
+
+	err = clk_prepare_enable(*hclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable hclk (%d)\n", err);
+		goto err_disable_pclk;
+	}
+
+	err = clk_prepare_enable(*tx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tx_clk (%d)\n", err);
+		goto err_disable_hclk;
+	}
+
+	err = clk_prepare_enable(*rx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable rx_clk (%d)\n", err);
+		goto err_disable_txclk;
+	}
+
+	err = clk_prepare_enable(*tsu_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tsu_clk (%d)\n", err);
+		goto err_disable_rxclk;
+	}
+
+	return 0;
+
+err_disable_rxclk:
+	clk_disable_unprepare(*rx_clk);
+
+err_disable_txclk:
+	clk_disable_unprepare(*tx_clk);
+
+err_disable_hclk:
+	clk_disable_unprepare(*hclk);
+
+err_disable_pclk:
+	clk_disable_unprepare(*pclk);
+
+	return err;
+}
+#endif
+
+static int phytium_clk_init(struct platform_device *pdev, struct clk **pclk,
+			    struct clk **hclk, struct clk **tx_clk,
+			    struct clk **rx_clk, struct clk **tsu_clk)
+{
+	struct macb_platform_data *pdata;
+	int err;
+
+	pdata = dev_get_platdata(&pdev->dev);
+	if (pdata) {
+		*pclk = pdata->pclk;
+		*hclk = pdata->hclk;
+		*tx_clk = pdata->phytium_macb_pdata.txclk;
+		*rx_clk = pdata->phytium_macb_pdata.rxclk;
+		*tsu_clk = pdata->phytium_macb_pdata.tsu_clk;
+	} else {
+		*pclk = devm_clk_get(&pdev->dev, "pclk");
+		*hclk = devm_clk_get(&pdev->dev, "hclk");
+		*tx_clk = devm_clk_get_optional(&pdev->dev, "tx_clk");
+		*rx_clk = devm_clk_get_optional(&pdev->dev, "rx_clk");
+		*tsu_clk = devm_clk_get_optional(&pdev->dev, "tsu_clk");
+	}
+
+	if (IS_ERR_OR_NULL(*pclk))
+		return dev_err_probe(&pdev->dev,
+				     IS_ERR(*pclk) ? PTR_ERR(*pclk) : -ENODEV,
+				     "failed to get pclk\n");
+
+	if (IS_ERR_OR_NULL(*hclk))
+		return dev_err_probe(&pdev->dev,
+				     IS_ERR(*hclk) ? PTR_ERR(*hclk) : -ENODEV,
+				     "failed to get hclk\n");
+
+	if (IS_ERR(*tx_clk))
+		return PTR_ERR(*tx_clk);
+
+	if (IS_ERR(*rx_clk))
+		return PTR_ERR(*rx_clk);
+
+	if (IS_ERR(*tsu_clk))
+		return PTR_ERR(*tsu_clk);
+
+	err = clk_prepare_enable(*pclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable pclk (%d)\n", err);
+		return err;
+	}
+
+	err = clk_prepare_enable(*hclk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable hclk (%d)\n", err);
+		goto err_disable_pclk;
+	}
+
+	err = clk_prepare_enable(*tx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tx_clk (%d)\n", err);
+		goto err_disable_hclk;
+	}
+
+	err = clk_prepare_enable(*rx_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable rx_clk (%d)\n", err);
+		goto err_disable_txclk;
+	}
+
+	err = clk_prepare_enable(*tsu_clk);
+	if (err) {
+		dev_err(&pdev->dev, "failed to enable tsu_clk (%d)\n", err);
+		goto err_disable_rxclk;
+	}
+
+	return 0;
+
+err_disable_rxclk:
+	clk_disable_unprepare(*rx_clk);
+
+err_disable_txclk:
+	clk_disable_unprepare(*tx_clk);
+
+err_disable_hclk:
+	clk_disable_unprepare(*hclk);
+
+err_disable_pclk:
+	clk_disable_unprepare(*pclk);
+
+	return err;
+}
+
 static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
 			 struct clk **hclk, struct clk **tx_clk,
 			 struct clk **rx_clk, struct clk **tsu_clk)
 {
 	struct macb_platform_data *pdata;
 	int err;
-
-	/* clk get not support ACPI */
-	if (has_acpi_companion(&pdev->dev)) {
-		dev_info(&pdev->dev, "ACPI skip get macb clk\n");
-		*pclk = NULL;
-		*hclk = NULL;
-		*tx_clk = NULL;
-		*rx_clk = NULL;
-		*tsu_clk = NULL;
-		return 0;
-	}
 
 	pdata = dev_get_platdata(&pdev->dev);
 	if (pdata) {
@@ -4188,6 +4368,225 @@ err_disable_pclk:
 	clk_disable_unprepare(*pclk);
 
 	return err;
+}
+
+static irqreturn_t phytium_macb_interrupt_intx(int irq, void *dev_id)
+{
+	struct macb *bp = dev_id;
+	u32 irq_mask;
+	int i;
+
+	irq_mask = gem_readl(bp, INTX_IRQ_MASK);
+	if (unlikely(!irq_mask))
+		return IRQ_NONE;
+
+	gem_writel(bp, INTX_IRQ_MASK, irq_mask);
+
+	for (i = 0; i < bp->num_queues; i++) {
+		if ((irq_mask & bp->queue_mask) & BIT(i))
+			macb_interrupt(irq, &bp->queues[i]);
+	}
+	return IRQ_HANDLED;
+}
+
+static int phytium_queue_request_irq(struct platform_device *pdev, unsigned int q)
+{
+	int err;
+	struct macb_queue *queue;
+	struct macb_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct net_device *dev = platform_get_drvdata(pdev);
+	struct macb *bp = netdev_priv(dev);
+
+	queue = &bp->queues[q];
+	if (q == 0 && pdata->phytium_macb_pdata.irq_type == IRQ_TYPE_INTX) {
+		dev->irq = pdata->phytium_macb_pdata.irq[q];
+		err = devm_request_irq(&pdev->dev, dev->irq, phytium_macb_interrupt_intx,
+				       IRQF_SHARED, dev->name, bp);
+		if (err) {
+			dev_err(&pdev->dev,
+				"Unable to request dev %d (error %d)\n",
+				dev->irq, err);
+		}
+	}
+
+	if (pdata->phytium_macb_pdata.irq_type == IRQ_TYPE_MSI) {
+		queue->irq = pdata->phytium_macb_pdata.irq[q];
+		err = devm_request_irq(&pdev->dev, queue->irq, macb_interrupt,
+				       0, dev->name, queue);
+		if (err) {
+			dev_err(&pdev->dev,
+				"Unable to request IRQ %d (error %d)\n",
+				queue->irq, err);
+		}
+	}
+
+	return err;
+}
+
+static int phytium_init(struct platform_device *pdev)
+{
+	struct net_device *dev = platform_get_drvdata(pdev);
+	unsigned int hw_q, q;
+	struct macb *bp = netdev_priv(dev);
+	struct macb_queue *queue;
+	int err;
+	u32 val, reg;
+	struct macb_platform_data *pdata;
+
+	bp->tx_ring_size = DEFAULT_TX_RING_SIZE;
+	bp->rx_ring_size = DEFAULT_RX_RING_SIZE;
+
+	pdata = dev_get_platdata(&pdev->dev);
+
+	/* set the queue register mapping once for all: queue0 has a special
+	 * register mapping but we don't want to test the queue index then
+	 * compute the corresponding register offset at run time.
+	 */
+	for (hw_q = 0, q = 0; hw_q < MACB_MAX_QUEUES; ++hw_q) {
+		if (!(bp->queue_mask & (1 << hw_q)))
+			continue;
+
+		queue = &bp->queues[q];
+		queue->bp = bp;
+		netif_napi_add(dev, &queue->napi, macb_poll, NAPI_POLL_WEIGHT);
+		if (hw_q) {
+			queue->ISR  = GEM_ISR(hw_q - 1);
+			queue->IER  = GEM_IER(hw_q - 1);
+			queue->IDR  = GEM_IDR(hw_q - 1);
+			queue->IMR  = GEM_IMR(hw_q - 1);
+			queue->TBQP = GEM_TBQP(hw_q - 1);
+			queue->RBQP = GEM_RBQP(hw_q - 1);
+			queue->RBQS = GEM_RBQS(hw_q - 1);
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+			if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
+				queue->TBQPH = GEM_TBQPH(hw_q - 1);
+				queue->RBQPH = GEM_RBQPH(hw_q - 1);
+			}
+#endif
+		} else {
+			/* queue0 uses legacy registers */
+			queue->ISR  = MACB_ISR;
+			queue->IER  = MACB_IER;
+			queue->IDR  = MACB_IDR;
+			queue->IMR  = MACB_IMR;
+			queue->TBQP = MACB_TBQP;
+			queue->RBQP = MACB_RBQP;
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+			if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
+				queue->TBQPH = MACB_TBQPH;
+				queue->RBQPH = MACB_RBQPH;
+			}
+#endif
+		}
+
+		if (bp->caps & MACB_CAPS_TAILPTR)
+			queue->TAILADDR = GEM_TAIL(hw_q);
+		/* get irq: here we use the linux queue index, not the hardware
+		 * queue index. the queue irq definitions in the device tree
+		 * must remove the optional gaps that could exist in the
+		 * hardware queue mask.
+		 */
+		if (pdata && pdata->phytium_macb_pdata.phytium_dev_type == PHYTIUM_DEV_3P0) {
+			err = phytium_queue_request_irq(pdev, q);
+		} else {
+			queue->irq = platform_get_irq(pdev, q);
+			err = devm_request_irq(&pdev->dev, queue->irq, macb_interrupt,
+					       IRQF_SHARED, dev->name, queue);
+			if (err) {
+				dev_err(&pdev->dev,
+					"Unable to request IRQ %d (error %d)\n",
+					queue->irq, err);
+				return err;
+			}
+		}
+
+		INIT_WORK(&queue->tx_error_task, macb_tx_error_task);
+		q++;
+	}
+
+	dev->netdev_ops = &macb_netdev_ops;
+
+	/* setup appropriated routines according to adapter type */
+	if (macb_is_gem(bp)) {
+		bp->max_tx_length = GEM_MAX_TX_LEN;
+		bp->macbgem_ops.mog_alloc_rx_buffers = gem_alloc_rx_buffers;
+		bp->macbgem_ops.mog_free_rx_buffers = gem_free_rx_buffers;
+		bp->macbgem_ops.mog_init_rings = gem_init_rings;
+		bp->macbgem_ops.mog_rx = gem_rx;
+		dev->ethtool_ops = &gem_ethtool_ops;
+	} else {
+		bp->max_tx_length = MACB_MAX_TX_LEN;
+		bp->macbgem_ops.mog_alloc_rx_buffers = macb_alloc_rx_buffers;
+		bp->macbgem_ops.mog_free_rx_buffers = macb_free_rx_buffers;
+		bp->macbgem_ops.mog_init_rings = macb_init_rings;
+		bp->macbgem_ops.mog_rx = macb_rx;
+		dev->ethtool_ops = &macb_ethtool_ops;
+	}
+
+	/* Set features */
+	dev->hw_features = NETIF_F_SG;
+
+	/* Check LSO capability */
+	if (GEM_BFEXT(PBUF_LSO, gem_readl(bp, DCFG6)))
+		dev->hw_features |= MACB_NETIF_LSO;
+
+	/* Checksum offload is only available on gem with packet buffer */
+	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE))
+		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
+	if (bp->caps & MACB_CAPS_SG_DISABLED)
+		dev->hw_features &= ~NETIF_F_SG;
+	dev->features = dev->hw_features;
+
+	/* Check RX Flow Filters support.
+	 * Max Rx flows set by availability of screeners & compare regs:
+	 * each 4-tuple define requires 1 T2 screener reg + 3 compare regs
+	 */
+	reg = gem_readl(bp, DCFG8);
+	bp->max_tuples = min((GEM_BFEXT(SCR2CMP, reg) / 3),
+			     GEM_BFEXT(T2SCR, reg));
+	INIT_LIST_HEAD(&bp->rx_fs_list.list);
+	if (bp->max_tuples > 0) {
+		/* also needs one ethtype match to check IPv4 */
+		if (GEM_BFEXT(SCR2ETH, reg) > 0) {
+			/* program this reg now */
+			reg = 0;
+			reg = GEM_BFINS(ETHTCMP, (uint16_t)ETH_P_IP, reg);
+			gem_writel_n(bp, ETHT, SCRT2_ETHT, reg);
+			/* Filtering is supported in hw but don't enable it in kernel now */
+			dev->hw_features |= NETIF_F_NTUPLE;
+			/* init Rx flow definitions */
+			bp->rx_fs_list.count = 0;
+			spin_lock_init(&bp->rx_fs_lock);
+		} else {
+			bp->max_tuples = 0;
+		}
+	}
+
+	if (!(bp->caps & MACB_CAPS_USRIO_DISABLED)) {
+		val = 0;
+		if (phy_interface_mode_is_rgmii(bp->phy_interface))
+			val = GEM_BIT(RGMII);
+		else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
+			 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII))
+			val = MACB_BIT(RMII);
+		else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII))
+			val = MACB_BIT(MII);
+
+		if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
+			val |= MACB_BIT(CLKEN);
+
+		macb_or_gem_writel(bp, USRIO, val);
+	}
+
+	/* Set MII management clock divider */
+	val = macb_mdc_clk_div(bp);
+	val |= macb_dbw(bp);
+	if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
+		val |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL);
+	macb_writel(bp, NCFGR, val);
+
+	return 0;
 }
 
 static int macb_init(struct platform_device *pdev)
@@ -4937,8 +5336,8 @@ static const struct macb_config phytium_gem1p0_config = {
 			MACB_CAPS_BD_RD_PREFETCH |
 			MACB_CAPS_SEL_CLK,
 	.dma_burst_length = 16,
-	.clk_init = macb_clk_init,
-	.init = macb_init,
+	.clk_init = phytium_clk_init,
+	.init = phytium_init,
 	.jumbo_max_len = 16360,
 	.sel_clk_hw = phytium_gem1p0_sel_clk,
 };
@@ -4955,6 +5354,49 @@ static const struct macb_config phytium_gem2p0_config = {
 	.jumbo_max_len = 10240,
 	.sel_clk_hw = phytium_gem2p0_sel_clk,
 };
+
+static const struct macb_config phytium_gem3p0_config = {
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP |
+			MACB_CAPS_BD_RD_PREFETCH |
+			MACB_CAPS_SEL_CLK |
+			MACB_CAPS_TAILPTR,
+	.dma_burst_length = 16,
+	.clk_init = phytium_clk_init,
+	.init = phytium_init,
+	.jumbo_max_len = 10240,
+	.sel_clk_hw = phytium_gem3p0_sel_clk,
+};
+
+#ifdef CONFIG_ACPI
+static const struct macb_config phytium_gem1p0_acpi_config = {
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP |
+			MACB_CAPS_BD_RD_PREFETCH |
+			MACB_CAPS_SEL_CLK,
+	.dma_burst_length = 16,
+	.clk_init = phytium_clk_acpi_init,
+	.init = phytium_init,
+	.jumbo_max_len = 10240,
+	.sel_clk_hw = phytium_gem1p0_sel_clk,
+};
+
+static const struct macb_config phytium_gem3p0_acpi_config = {
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP |
+			MACB_CAPS_BD_RD_PREFETCH |
+			MACB_CAPS_SEL_CLK |
+			MACB_CAPS_TAILPTR,
+	.dma_burst_length = 16,
+	.clk_init = phytium_clk_acpi_init,
+	.init = phytium_init,
+	.jumbo_max_len = 10240,
+	.sel_clk_hw = phytium_gem3p0_sel_clk,
+};
+#endif
 
 static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,at32ap7000-macb" },
@@ -4975,6 +5417,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "sifive,fu540-c000-gem", .data = &fu540_c000_config },
 	{ .compatible = "cdns,phytium-gem-1.0", .data = &phytium_gem1p0_config },
 	{ .compatible = "cdns,phytium-gem-2.0", .data = &phytium_gem2p0_config },
+	{ .compatible = "cdns,phytium-gem-3.0", .data = &phytium_gem3p0_config },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, macb_dt_ids);
@@ -4982,7 +5425,8 @@ MODULE_DEVICE_TABLE(of, macb_dt_ids);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id macb_acpi_ids[] = {
-	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_gem1p0_config },
+	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_gem1p0_acpi_config },
+	{ .id = "PHYT0046", .driver_data = (kernel_ulong_t)&phytium_gem3p0_acpi_config },
 	{ }
 };
 
@@ -5035,9 +5479,10 @@ static int macb_probe(struct platform_device *pdev)
 			struct clk **) = macb_config->clk_init;
 	int (*init)(struct platform_device *) = macb_config->init;
 	struct device_node *np = pdev->dev.of_node;
-	struct clk *pclk, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
+	struct clk *pclk = NULL, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
 	struct clk *tsu_clk = NULL;
 	unsigned int queue_mask, num_queues;
+	struct macb_platform_data *pdata;
 	bool native_io;
 	struct net_device *dev;
 	struct resource *regs;
@@ -5045,6 +5490,15 @@ static int macb_probe(struct platform_device *pdev)
 	const char *mac;
 	struct macb *bp;
 	int err, val;
+
+	pdata = dev_get_platdata(&pdev->dev);
+	if (pdata) {
+		if (pdata->phytium_macb_pdata.phytium_dev_type == PHYTIUM_DEV_3P0) {
+			macb_config = &phytium_gem3p0_config;
+			clk_init = macb_config->clk_init;
+			init = macb_config->init;
+		}
+	}
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mem = devm_ioremap_resource(&pdev->dev, regs);
@@ -5178,10 +5632,14 @@ static int macb_probe(struct platform_device *pdev)
 	}
 
 	err = macb_get_phy_mode(pdev);
-	if (err < 0)
-		bp->phy_interface = PHY_INTERFACE_MODE_MII;
-	else
+	if (err < 0) {
+		if (pdata && pdata->phytium_macb_pdata.phytium_dev_type == PHYTIUM_DEV_3P0)
+			bp->phy_interface = pdata->phytium_macb_pdata.phy_interface;
+		else
+			bp->phy_interface = PHY_INTERFACE_MODE_MII;
+	} else {
 		bp->phy_interface = err;
+	}
 
 	bp->link = 0;
 	bp->duplex = DUPLEX_UNKNOWN;
@@ -5257,6 +5715,7 @@ static int macb_remove(struct platform_device *pdev)
 {
 	struct net_device *dev;
 	struct macb *bp;
+	struct macb_platform_data *pdata = dev_get_platdata(&pdev->dev);
 
 	dev = platform_get_drvdata(pdev);
 
@@ -5272,11 +5731,14 @@ static int macb_remove(struct platform_device *pdev)
 		pm_runtime_disable(&pdev->dev);
 		pm_runtime_dont_use_autosuspend(&pdev->dev);
 		if (!pm_runtime_suspended(&pdev->dev)) {
-			clk_disable_unprepare(bp->tx_clk);
-			clk_disable_unprepare(bp->hclk);
-			clk_disable_unprepare(bp->pclk);
-			clk_disable_unprepare(bp->rx_clk);
-			clk_disable_unprepare(bp->tsu_clk);
+			if (!pdata) {
+				clk_disable_unprepare(bp->tx_clk);
+				clk_disable_unprepare(bp->hclk);
+				clk_disable_unprepare(bp->pclk);
+				clk_disable_unprepare(bp->rx_clk);
+				clk_disable_unprepare(bp->tsu_clk);
+			}
+
 			pm_runtime_set_suspended(&pdev->dev);
 		}
 		phylink_destroy(bp->phylink);

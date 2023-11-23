@@ -1103,6 +1103,18 @@ config MMC_OWL
 config MMC_SDHCI_EXTERNAL_DMA
 	bool
 
+config MMC_PHYTIUM_SDCI
+	tristate "Phytium SD Host Controller support"
+	depends on ARCH_PHYTIUM || COMPILE_TEST
+	default y if ARCH_PHYTIUM
+	help
+	  This selects support for the SD/MMC Host Controller on
+	  Phytium SoC family.
+
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
 config MMC_PHYTIUM_MCI_PCI
 	tristate "Phytium octopus PCI MultiMedia Card Interface support"
 	depends on ARCH_PHYTIUM
