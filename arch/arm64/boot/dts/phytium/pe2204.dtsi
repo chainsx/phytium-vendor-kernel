@@ -10,23 +10,6 @@
 / {
 	compatible = "phytium,pe2204";
 
-	reserved-memory {
-		#address-cells = <0x2>;
-		#size-cells = <0x2>;
-		ranges;
-
-		rproc: rproc@b0100000 {
-			no-map;
-			reg = <0x0 0xb0100000 0x0 0x19900000>;
-		};
-	};
-
-	remoteproc: remoteproc@0 {
-		compatible = "phytium,rproc";
-		memory-region = <&rproc>;
-		status = "disabled";
-	};
-
 	aliases {
 		ethernet0 = &macb0;
 		ethernet1 = &macb1;

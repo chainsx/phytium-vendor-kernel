@@ -7,28 +7,19 @@
  * This program is free software; you can redistribute it and/or modify it under the terms
  * of the GNU General Public License version 2 as published by the Free Software Foundation.
  */
-#include <linux/init.h>
 #include <linux/module.h>
-#include <linux/remoteproc.h>
-#include <linux/arm-smccc.h>
-#include <linux/kthread.h>
-#include <linux/platform_device.h>
-#include <linux/of_reserved_mem.h>
-#include <linux/delay.h>
-#include <asm/cacheflush.h>
-#include <linux/vmalloc.h>
-#include <linux/io.h>
 #include <linux/kallsyms.h>
+#include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/irqdomain.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
+#include <linux/platform_device.h>
+#include <linux/arm-smccc.h>
 #include <linux/irqchip/arm-gic-v3.h>
-#include <asm/arch_gicv3.h>
-#include <linux/cpu.h>
-
 #include <asm/smp_plat.h>
-#include <linux/device.h>
+#include <linux/remoteproc.h>
 #include <linux/psci.h>
+#include <linux/cpu.h>
+#include <linux/cpuhotplug.h>
 
 #include "remoteproc_internal.h"
 
@@ -40,9 +31,6 @@
 #define CPU_ON                      0xc4000003
 #define AFFINITY_INFO               0xc4000004
 #define MIGRATE                     0xc4000005
-
-static typeof(ioremap_page_range) *ioremap_page_range_sym;
-static typeof(__flush_dcache_area) *__flush_dcache_area_sym;
 
 /* Resource table for the homo remote processors */
 struct homo_resource_table {
@@ -73,14 +61,6 @@ struct homo_rproc {
 
 static struct homo_rproc *g_priv;
 static struct work_struct workqueue;
-
-static unsigned int cpuid = 3;
-module_param(cpuid, uint, 0);
-MODULE_PARM_DESC(cpuid, "Cpu logical number used exclusively by the remote processor. default is 3.");
-
-static unsigned int sgi = 9;
-module_param(sgi, uint, 0);
-MODULE_PARM_DESC(sgi, "GIC SGI interrupt number for communication with remote processor. default is 9");
 
 #define MPIDR_TO_SGI_AFFINITY(cluster_id, level)        (MPIDR_AFFINITY_LEVEL(cluster_id, level) << ICC_SGI1R_AFFINITY_## level ## _SHIFT)
 
@@ -180,28 +160,41 @@ static const struct rproc_ops homo_rproc_ops = {
 	.da_to_va = homo_rproc_da_to_va,
 };
 
-static void *homo_rproc_ioremap(phys_addr_t phys,
-		unsigned long virt, unsigned long size)
+static void __iomem *homo_ioremap_prot(phys_addr_t addr, size_t size, pgprot_t prot)
 {
-	struct vm_struct *vma;
+	unsigned long offset, vaddr;
+	phys_addr_t last_addr;
+	struct vm_struct *area;
 
-	size = PAGE_ALIGN(size);
-
-	if (virt)
-		vma = __get_vm_area(size, VM_IOREMAP, virt, virt + size + PAGE_SIZE);
-	else
-		vma = __get_vm_area(size, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
-	if (!vma)
+	/* Disallow wrap-around or zero size */
+	last_addr = addr + size - 1;
+	if (!size || last_addr < addr)
 		return NULL;
 
-	vma->phys_addr = phys;
+	/* Page-align mappings */
+	offset = addr & (~PAGE_MASK);
+	addr -= offset;
+	size = PAGE_ALIGN(size + offset);
 
-	if (ioremap_page_range_sym((unsigned long)vma->addr, (unsigned long)vma->addr + size, phys, PAGE_KERNEL_EXEC)) {
-		vunmap(vma->addr);
+	area = get_vm_area_caller(size, VM_IOREMAP,
+			__builtin_return_address(0));
+	if (!area)
+		return NULL;
+	vaddr = (unsigned long)area->addr;
+
+	if (ioremap_page_range(vaddr, vaddr + size, addr, prot)) {
+		free_vm_area(area);
 		return NULL;
 	}
 
-	return vma->addr;
+	return (void __iomem *)(vaddr + offset);
+}
+
+static int homo_of_parse_firmware(struct device *dev, int index, const char **fw_name)
+{
+	int ret;
+	ret = of_property_read_string_index(dev->of_node, "firmware-name", index, fw_name);
+	return ret ? ret : 0;
 }
 
 static int homo_rproc_probe(struct platform_device *pdev)
@@ -209,71 +202,71 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct device_node *np_mem;
+	struct resource res;
 	struct rproc *rproc;
+	const char *fw_name;
 	struct homo_rproc *priv;
-	u32 phandle;
 	int ret;
+	unsigned int ipi, cpu;
 
-	rproc = rproc_alloc(dev, np->name, &homo_rproc_ops,
-			"openamp_core0.elf", sizeof(*priv));
+	ret = homo_of_parse_firmware(dev, 0, &fw_name);
+	if (ret) {
+		dev_err(dev, "failed to parse firmware-name property, ret = %d\n", ret);
+		return ret;
+	}
+
+	rproc = rproc_alloc(dev, np->name, &homo_rproc_ops, fw_name, sizeof(*priv));
 	if (!rproc)
 		return -ENOMEM;
+
+	rproc->auto_boot = false;
+	rproc->has_iommu = false;
 
 	platform_set_drvdata(pdev, rproc);
 
 	priv = g_priv = rproc->priv;
 	priv->rproc = rproc;
 
-	/* Lookup kernel symbol that is not exported out. */
-	ioremap_page_range_sym = (void *)kallsyms_lookup_name("ioremap_page_range");
-	if (ioremap_page_range_sym == NULL) {
-		dev_err(dev, "Symbol 'ioremap_page_range' not found.\n");
-		return -1;
-	}
-
-	__flush_dcache_area_sym = (void *)kallsyms_lookup_name("__flush_dcache_area");
-	if (__flush_dcache_area_sym == NULL) {
-		dev_err(dev, "Symbol '__flush_dcache_area' not found.\n");
-		return -1;
-	}
-
-	ret = of_property_read_u32(np, "memory-region", &phandle);
-	if (ret) {
-		dev_err(dev, "Can't find memory-region for Baremetal\n");
-		return ret;
-	}
-
-	np_mem = of_find_node_by_phandle(phandle);
-	if (!np_mem) {
-		dev_err(dev, "Cant' find corresponding memory-region\n");
+	/* The following values can be modified through devicetree 'homo_rproc' node */
+	if (of_property_read_u32(np, "remote-processor", &cpu)) {
+		dev_err(dev, "not found 'remote-processor' property\n");
 		return -EINVAL;
-	} else {
-		int n = of_property_count_elems_of_size(np_mem, "reg", sizeof(u64));
+	}
 
-		if (n != 2) {
-			dev_err(dev, "Memory address and size not found in devicetree!\n");
-			return -EINVAL;
-		}
+	if (of_property_read_u32(np, "inter-processor-interrupt", &ipi)) {
+		dev_err(dev, "not found 'inter-processor-interrupt' property\n");
+		return -EINVAL;
+	}
 
-		of_property_read_u64_index(np_mem, "reg", 0, &priv->phys_addr);
-		of_property_read_u64_index(np_mem, "reg", 1, &priv->size);
+	/* The gic-v3 driver has registered the 0-7 range of SGI interrupt for system purpose */
+	if (ipi < 8) {
+		dev_err(dev, "'inter-processor-interrupt' is %d, should be between 9~15\n", ipi);
+		return -EINVAL;
+	}
 
-		dev_info(dev, "Baremetal Address: %llx, size: %llx\n",
-				priv->phys_addr, priv->size);
+	priv->cpu = cpu;
+	priv->irq = ipi;
+
+	dev_info(dev, "remote-processor = %d, inter-processor-interrupt = %d\n", cpu, ipi);
+
+	np_mem = of_parse_phandle(np, "memory-region", 0);
+	ret = of_address_to_resource(np_mem, 0, &res);
+	if (ret) {
+		dev_err(dev, "can't find memory-region for Baremetal\n");
+		return ret;
 	}
 
 	priv->rsc = NULL;
 	priv->addr = NULL;
 
-	/* The following values can be modified through module parameters */
-	priv->irq = sgi;
-	priv->cpu = cpuid;
+	priv->phys_addr = res.start;
+	priv->size = resource_size(&res);
 
 	/* Map physical memory region reserved for homo remote processor. */
-	priv->addr = homo_rproc_ioremap(priv->phys_addr, 0, priv->size);
+	priv->addr = homo_ioremap_prot(priv->phys_addr, priv->size, PAGE_KERNEL_EXEC);
 	if (!priv->addr) {
 		dev_err(dev, "ioremap failed\n");
-		return -1;
+		return -ENOMEM;
 	}
 	dev_info(dev, "ioremap: phys_addr = %016llx, addr = %llx, size = %lld\n",
 			priv->phys_addr, (u64)(priv->addr), priv->size);
@@ -283,30 +276,31 @@ static int homo_rproc_probe(struct platform_device *pdev)
 	rproc->auto_boot = false;
 	rproc->has_iommu = false;
 
-	rproc_add(rproc);
+	ret = rproc_add(rproc);
+	if (ret) {
+		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n", ret);
+		goto err;
+	}
 
 	return 0;
+
+err:
+	vunmap((void *)((unsigned long)priv->addr & PAGE_MASK));
+	return ret;
 }
 
 static int homo_rproc_remove(struct platform_device *pdev)
 {
 	struct rproc *rproc = platform_get_drvdata(pdev);
-	struct homo_rproc *priv = rproc->priv;
 
 	rproc_del(rproc);
-	of_reserved_mem_device_release(&pdev->dev);
 	rproc_free(rproc);
-
-	if (priv->addr) {
-		vunmap(priv->addr);
-		priv->addr = NULL;
-	}
 
 	return 0;
 }
 
 static const struct of_device_id homo_rproc_ids[] = {
-	{ .compatible = "phytium,rproc", },
+	{ .compatible = "homo,rproc", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, homo_rproc_ids);
