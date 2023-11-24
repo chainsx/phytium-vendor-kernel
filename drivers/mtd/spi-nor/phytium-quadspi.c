@@ -274,7 +274,8 @@ static int phytium_qspi_wait_cmd(struct phytium_qspi *qspi,
 				struct phytium_qspi_flash *flash)
 {
 	u32 cmd = 0;
-	u32 cnt = 0;
+	u32 stat;
+	int ret;
 
 	cmd |= CMD_RDSR << QSPI_CMD_PORT_CMD_SHIFT;
 	cmd |= BIT(QSPI_CMD_PORT_DATA_TRANSFER_SHIFT);
@@ -282,17 +283,15 @@ static int phytium_qspi_wait_cmd(struct phytium_qspi *qspi,
 
 	writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
 
-	cnt = PHYTIUM_QSPI_BUSY_TIMEOUT_US / 10;
-	while (readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG) & 0x01) {
-		udelay(10);
-		cnt--;
-		if (!cnt) {
-			dev_err(qspi->dev, "wait command process timeout\n");
-			break;
-		}
+	ret = readl_poll_timeout(qspi->io_base + QSPI_LD_PORT_REG, 
+				stat, 
+				!(stat & 0x01), 10, 
+				PHYTIUM_QSPI_BUSY_TIMEOUT_US);	
+	if (ret) {
+		dev_err(qspi->dev, "wait command process timeout\n");
 	}
 
-	return !cnt;
+	return ret;
 }
 
 static int phytium_qspi_cmd_enable(struct phytium_qspi *qspi)
@@ -506,6 +505,38 @@ static ssize_t phytium_qspi_read_tmp(struct phytium_qspi *qspi, u32 read_cmd,
 	return len;
 }
 
+static int phytium_qspi_get_transfer(enum spi_nor_protocol proto)
+{
+	int transfer = 0;
+	/* QSPI protocol */
+	switch (proto) {
+	case SNOR_PROTO_1_1_1:
+		transfer = PHYTIUM_QSPI_1_1_1;
+		break;
+
+	case SNOR_PROTO_1_1_2:
+		transfer = PHYTIUM_QSPI_1_1_2;
+		break;
+
+	case SNOR_PROTO_1_1_4:
+		transfer = PHYTIUM_QSPI_1_1_4;
+		break;
+
+	case SNOR_PROTO_1_2_2:
+		transfer = PHYTIUM_QSPI_1_2_2;
+		break;
+
+	case SNOR_PROTO_1_4_4:
+		transfer = PHYTIUM_QSPI_1_4_4;
+		break;
+
+	default:
+		break;
+	}
+
+	return transfer;
+}
+
 static ssize_t phytium_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 				 u_char *buf)
 {
@@ -513,6 +544,7 @@ static ssize_t phytium_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 	struct phytium_qspi *qspi = flash->qspi;
 	u32 cmd = nor->read_opcode;
 	u32 addr = (u32)from;
+	u32 transfer = PHYTIUM_QSPI_1_1_1;
 
 	addr = addr + flash->cs * flash->fsize;
 	dev_dbg(qspi->dev, "read(%#.2x): buf:%pK from:%#.8x len:%#zx\n",
@@ -523,7 +555,8 @@ static ssize_t phytium_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 	cmd |= flash->clk_div << QSPI_CMD_PORT_SCK_SEL_SHIFT;
 
 	cmd &= ~QSPI_RD_CFG_RD_TRANSFER_MASK;
-	cmd |= (flash->addr_width << QSPI_RD_CFG_RD_TRANSFER_SHIFT);
+	transfer = phytium_qspi_get_transfer(nor->read_proto);
+	cmd |= (transfer << QSPI_RD_CFG_RD_TRANSFER_SHIFT);
 
 	switch (nor->read_opcode) {
 	case CMD_READ:
@@ -546,12 +579,11 @@ static ssize_t phytium_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 		break;
 	}
 
-	if((PHYTIUM_QSPI_1_1_4 == flash->addr_width) ||
-	   (PHYTIUM_QSPI_1_4_4 == flash->addr_width)) {
+	if(nor->read_dummy != 0) {
 		cmd |= BIT(QSPI_RD_CFG_RD_LATENCY_SHIFT);
 
 		cmd &= ~QSPI_RD_CFG_DUMMY_MASK;
-		cmd |= (0x07 << QSPI_RD_CFG_DUMMY_SHIFT);
+		cmd |= (nor->read_dummy - 1) << QSPI_RD_CFG_DUMMY_SHIFT;
 	}
 
 	dev_dbg(qspi->dev, "read(%#.2x): cmd:%#x\n", nor->read_opcode, cmd);
@@ -754,6 +786,7 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	u32 addr_width = PHYTIUM_QSPI_1_1_1;
 	struct phytium_qspi_flash *flash;
 	struct mtd_info *mtd;
+	struct device_node *of_node;
 	int ret;
 
 	fwnode_property_read_u32(np, "reg", &cs_num);
@@ -794,8 +827,11 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 	flash->addr_width = addr_width;
 
 	flash->nor.dev = qspi->dev;
-	if (qspi->dev->of_node)
-		spi_nor_set_flash_node(&flash->nor, qspi->dev->of_node);
+	if (qspi->dev->of_node) {
+                of_node = container_of(np, struct device_node, fwnode);
+		spi_nor_set_flash_node(&flash->nor, of_node);
+	}
+		
 	flash->nor.priv = flash;
 	mtd = &flash->nor.mtd;
 

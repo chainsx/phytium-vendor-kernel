@@ -239,7 +239,3 @@
 &rng0 {
 	status = "okay";
 };
-
-&remoteproc {
-	status = "okay";
-};
