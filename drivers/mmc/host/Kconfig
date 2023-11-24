@@ -967,3 +967,9 @@ config MMC_PHYTIUM_MCI_PLTFM
 	  If you have a controller with this interface, say Y or M here.
 
 	  If unsure, say N.
+
+config MMC_PHYTIUM_SDCI
+        tristate "Phytium SD Host Controller support"
+        depends on ARM64
+        help
+            This selects support for the Phytium SD Host Controller
