@@ -42,7 +42,6 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
-#include <asm/cacheflush.h>
 
 #include "remoteproc_internal.h"
 
@@ -258,8 +257,6 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	rsc = (void *)rproc->table_ptr + rvdev->rsc_offset;
 	rsc->vring[i].da = dma;
 	rsc->vring[i].notifyid = notifyid;
-
-	__flush_dcache_area(rproc->table_ptr, rproc->table_sz);
 
 	return 0;
 }
