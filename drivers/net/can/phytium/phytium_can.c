@@ -917,11 +917,12 @@ static int phytium_can_open(struct net_device *dev)
 	struct phytium_can_dev *cdev = netdev_priv(dev);
 	int ret;
 
-	/* Start clock */
-	ret = pm_runtime_resume(cdev->dev);
-	if (ret)
+	ret = pm_runtime_get_sync(cdev->dev);
+	if (ret < 0) {
+		netdev_err(dev, "%s: pm_runtime_get failed(%d)\n",
+					 __func__, ret);
 		return ret;
-
+	}
 	/* Open the CAN device */
 	ret = open_candev(dev);
 	if (ret) {
@@ -946,6 +947,7 @@ static int phytium_can_open(struct net_device *dev)
 	return 0;
 
 fail:
+	pm_runtime_put(cdev->dev);
 	close_candev(dev);
 disable_clk:
 	pm_runtime_put_sync(cdev->dev);
@@ -1061,10 +1063,6 @@ EXPORT_SYMBOL(phytium_can_free_dev);
 int phytium_can_register(struct phytium_can_dev *cdev)
 {
 	int ret;
-
-	ret = pm_runtime_resume(cdev->dev);
-	if (ret)
-		return ret;
 
 	ret = phytium_can_dev_setup(cdev);
 	if (ret)
