@@ -76,17 +76,31 @@ static int phytium_can_pci_probe(struct pci_dev *pdev, const struct pci_device_i
 	cdev->can.clock.freq = cfg->clock_freq;
 	cdev->tx_fifo_depth = cfg->tx_fifo_depth;
 
+	cdev->tx_head = 0;
+	cdev->tx_tail = 0;
+	cdev->tx_max = cfg->tx_fifo_depth;
+
 	cdev->base = priv->base;
 	cdev->net->irq = pdev->irq;
 
 	pci_set_drvdata(pdev, cdev->net);
 
-	pm_runtime_enable(cdev->dev);
+	if (!pm_runtime_enabled(cdev->dev))
+		pm_runtime_enable(cdev->dev);
+	ret = pm_runtime_get_sync(cdev->dev);
+	if (ret < 0) {
+		netdev_err(cdev->net, "%s: pm_runtime_get failed(%d)\n",
+					__func__, ret);
+		goto err_pmdisable;
+	}
 	ret = phytium_can_register(cdev);
 	if (ret)
 		goto err;
 
 	return 0;
+
+err_pmdisable:
+	pm_runtime_disable(&pdev->dev);
 err:
 	return ret;
 }
@@ -95,6 +109,8 @@ static void phytium_can_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct phytium_can_dev *cdev = netdev_priv(dev);
+
+	pm_runtime_disable(cdev->dev);
 
 	phytium_can_unregister(cdev);
 	phytium_can_free_dev(cdev->net);
@@ -117,6 +133,7 @@ static const struct pci_device_id phytium_can_pci_id_table[] = {
 	{ PCI_VDEVICE(PHYTIUM, 0xdc2d), (kernel_ulong_t)&phytium_can_pci_data, },
 	{ /* sentinel */ },
 };
+MODULE_DEVICE_TABLE(pci, phytium_can_pci_id_table);
 
 static struct pci_driver phytium_can_pci_driver = {
 	.name = KBUILD_MODNAME,
