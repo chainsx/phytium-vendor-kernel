@@ -11,7 +11,7 @@
 #define PE220X_DC_PIX_CLOCK_MAX				(594000)
 #define PE220X_DC_HDISPLAY_MAX				3840
 #define PE220X_DC_VDISPLAY_MAX				2160
-#define PE220X_DC_ADDRESS_MASK				0x3f
+#define PE220X_DC_ADDRESS_MASK				0x7f
 
 extern void pe220x_dc_hw_vram_init(struct phytium_display_private *priv,
 				  resource_size_t vram_addr,

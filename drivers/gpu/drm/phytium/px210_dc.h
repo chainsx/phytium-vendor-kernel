@@ -10,7 +10,7 @@
 #define PX210_DC_PIX_CLOCK_MAX				(594000)
 #define px210_DC_HDISPLAY_MAX				3840
 #define PX210_DC_VDISPLAY_MAX				2160
-#define PX210_DC_ADDRESS_MASK				0x3f
+#define PX210_DC_ADDRESS_MASK				0x7f
 
 extern void px210_dc_hw_vram_init(struct phytium_display_private *priv,
 					   resource_size_t vram_addr,

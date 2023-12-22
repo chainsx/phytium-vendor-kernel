@@ -97,6 +97,7 @@ struct phytium_dp_device {
 	uint32_t trigger_train_fail;
 
 	unsigned char train_set[4];
+	struct edid *edp_edid;
 	bool has_audio;
 	bool fast_train_support;
 	bool hw_spread_enable;
@@ -137,6 +138,7 @@ enum phytium_dpcd_phy_tp {
 	PHYTIUM_PHY_TP_CP2520_2,
 	PHYTIUM_PHY_TP_CP2520_3,
 };
+#define PHYTIUM_DP_AUDIO_ID	(('P' << 24) + ('H' << 16) + ('Y' << 8))
 #define encoder_to_dp_device(x) container_of(x, struct phytium_dp_device, encoder)
 #define connector_to_dp_device(x) container_of(x, struct phytium_dp_device, connector)
 #define panel_to_dp_device(x) container_of(x, struct phytium_dp_device, panel)
