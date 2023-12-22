@@ -115,17 +115,17 @@ static int pmdk_dp2_init(struct snd_soc_pcm_runtime *runtime)
 
 SND_SOC_DAILINK_DEFS(pmdk_dp0_dai,
 	DAILINK_COMP_ARRAY(COMP_CPU("phytium-i2s-dp0")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.0", "i2s-hifi")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.1346918656", "i2s-hifi")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(pmdk_dp1_dai,
 	DAILINK_COMP_ARRAY(COMP_CPU("phytium-i2s-dp1")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.1", "i2s-hifi")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.1346918657", "i2s-hifi")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(pmdk_dp2_dai,
 	DAILINK_COMP_ARRAY(COMP_CPU("phytium-i2s-dp2")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.2", "i2s-hifi")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("hdmi-audio-codec.1346918658", "i2s-hifi")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 static struct snd_soc_dai_link pmdk_dai_local[] = {
