@@ -28,8 +28,10 @@ static void handle_plugged_change(struct phytium_dp_device *phytium_dp, bool plu
 static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp);
 static void phytium_edp_fini_connector(struct phytium_dp_device *phytium_dp);
 static void phytium_edp_panel_poweroff(struct phytium_dp_device *phytium_dp);
+static void phytium_dp_audio_codec_fini(struct phytium_dp_device *phytium_dp);
 
 static int phytium_rate[] = {162000, 270000, 540000, 810000};
+static int codec_id = PHYTIUM_DP_AUDIO_ID;
 
 void phytium_phy_writel(struct phytium_dp_device *phytium_dp, uint32_t address, uint32_t data)
 {
@@ -877,7 +879,10 @@ void phytium_dp_hw_config_video(struct phytium_dp_device *phytium_dp)
 	/* mul 10 for register setting */
 	data_per_tu = 10*tu_size * date_rate/link_bw;
 	symbols_per_tu = (data_per_tu/10)&0xff;
-	frac_symbols_per_tu = (data_per_tu%10*16/10) & 0xf;
+	if (symbols_per_tu == 63)
+		frac_symbols_per_tu = 0;
+	else
+		frac_symbols_per_tu = (data_per_tu%10*16/10) & 0xf;
 	phytium_writel_reg(priv, frac_symbols_per_tu<<24 | symbols_per_tu<<16 | tu_size,
 			   group_offset, PHYTIUM_DP_TRANSFER_UNIT_SIZE);
 
@@ -2258,8 +2263,16 @@ static const struct drm_encoder_helper_funcs phytium_encoder_helper_funcs = {
 	.mode_valid = phytium_encoder_mode_valid,
 };
 
+void phytium_dp_encoder_destroy(struct drm_encoder *encoder)
+{
+	struct phytium_dp_device *phytium_dp = encoder_to_dp_device(encoder);
+
+	phytium_dp_audio_codec_fini(phytium_dp);
+	drm_encoder_cleanup(encoder);
+}
+
 static const struct drm_encoder_funcs phytium_encoder_funcs = {
-	.destroy = drm_encoder_cleanup,
+	.destroy = phytium_dp_encoder_destroy,
 };
 
 static const struct dp_audio_n_m phytium_dp_audio_n_m[] = {
@@ -2412,7 +2425,8 @@ static const struct hdmi_codec_ops phytium_audio_codec_ops = {
 	.hook_plugged_cb = phytium_dp_audio_hook_plugged_cb,
 };
 
-static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp, int port)
+static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp,
+				       const int port)
 {
 	struct device *dev = phytium_dp->dev->dev;
 	struct hdmi_codec_pdata codec_data = {
@@ -2424,10 +2438,17 @@ static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp, int
 	};
 
 	phytium_dp->audio_pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
-							       port,
+							       codec_id + port,
 							       &codec_data, sizeof(codec_data));
 
 	return PTR_ERR_OR_ZERO(phytium_dp->audio_pdev);
+}
+
+static void phytium_dp_audio_codec_fini(struct phytium_dp_device *phytium_dp)
+{
+	if (!PTR_ERR_OR_ZERO(phytium_dp->audio_pdev))
+		platform_device_unregister(phytium_dp->audio_pdev);
+	phytium_dp->audio_pdev = NULL;
 }
 
 static long phytium_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
