@@ -918,12 +918,14 @@ config UCB1400_CORE
 config MFD_PHYTIUM_I2S_LSD
 	tristate "PHYTIUM Px210 I2S LSD MFD driver"
 	depends on (PCI && ARCH_PHYTIUM)
+	select MFD_CORE
 	help
 	  This enables support for the Phytium Px210 LSD I2S controller.
 
 config MFD_PHYTIUM_I2S_MMD
 	tristate "PHYTIUM Px210 I2S MMD MFD driver"
 	depends on (PCI && ARCH_PHYTIUM)
+	select MFD_CORE
 	help
 	  This enables support for the Phytium Px210 MMD I2S controllers
 	  for Display Port.
