@@ -22,9 +22,12 @@
 static void phytium_dp_aux_init(struct phytium_dp_device *phytium_dp);
 static void handle_plugged_change(struct phytium_dp_device *phytium_dp, bool plugged);
 static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp);
+static void phytium_edp_fini_connector(struct phytium_dp_device *phytium_dp);
 static void phytium_edp_panel_poweroff(struct phytium_dp_device *phytium_dp);
+static void phytium_dp_audio_codec_fini(struct phytium_dp_device *phytium_dp);
 
 static int phytium_rate[] = {162000, 270000, 540000, 810000};
+static int codec_id = PHYTIUM_DP_AUDIO_ID;
 
 void phytium_phy_writel(struct phytium_dp_device *phytium_dp, uint32_t address, uint32_t data)
 {
@@ -309,7 +312,11 @@ static int phytium_connector_get_modes(struct drm_connector *connector)
 	struct edid *edid;
 	int ret = 0;
 
-	edid = drm_get_edid(connector, &phytium_dp->aux.ddc);
+	if (phytium_dp->is_edp)
+		edid = phytium_dp->edp_edid;
+	else
+		edid = drm_get_edid(connector, &phytium_dp->aux.ddc);
+
 	if (edid && drm_edid_is_valid(edid)) {
 		drm_connector_update_edid_property(connector, edid);
 		ret = drm_add_edid_modes(connector, edid);
@@ -322,54 +329,10 @@ static int phytium_connector_get_modes(struct drm_connector *connector)
 		phytium_dp->has_audio = false;
 	}
 
-	kfree(edid);
+	if (!phytium_dp->is_edp)
+		kfree(edid);
 
 	return ret;
-}
-
-static int
-phytium_connector_mode_valid(struct drm_connector *connector,
-					struct drm_display_mode *mode)
-{
-	struct phytium_dp_device *phytium_dp = connector_to_dp_device(connector);
-	struct drm_display_info *display_info = &phytium_dp->connector.display_info;
-	unsigned int requested, actual;
-
-	switch (display_info->bpc) {
-	case 10:
-	case 6:
-	case 8:
-		break;
-	default:
-		DRM_INFO("not support bpc(%d)\n", display_info->bpc);
-		display_info->bpc = 8;
-		break;
-	}
-
-	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
-		DRM_INFO("not support color_format(%d)\n", display_info->color_formats);
-		display_info->color_formats = DRM_COLOR_FORMAT_RGB444;
-	}
-
-	requested = mode->clock * display_info->bpc * 3 / 1000;
-	actual = phytium_dp->max_link_rate * phytium_dp->max_link_lane_count / 100;
-	actual = actual * 8 / 10;
-	if (requested >= actual) {
-		DRM_DEBUG_KMS("requested=%d, actual=%d, clock=%d\n", requested, actual,
-				mode->clock);
-		return MODE_CLOCK_HIGH;
-	}
-
-	if ((mode->hdisplay == 1600) && (mode->vdisplay == 900))
-		return MODE_BAD_HVALUE;
-
-	if ((mode->hdisplay == 1024) && (mode->clock > 78000))
-		return MODE_BAD_HVALUE;
-
-	if ((mode->hdisplay < 640) || (mode->vdisplay < 480))
-		return MODE_BAD_HVALUE;
-
-	return MODE_OK;
 }
 
 static struct drm_encoder *phytium_dp_best_encoder(struct drm_connector *connector)
@@ -382,7 +345,6 @@ static struct drm_encoder *phytium_dp_best_encoder(struct drm_connector *connect
 static const
 struct drm_connector_helper_funcs phytium_connector_helper_funcs = {
 	.get_modes  = phytium_connector_get_modes,
-	.mode_valid = phytium_connector_mode_valid,
 	.best_encoder = phytium_dp_best_encoder,
 };
 
@@ -913,7 +875,10 @@ void phytium_dp_hw_config_video(struct phytium_dp_device *phytium_dp)
 	/* mul 10 for register setting */
 	data_per_tu = 10*tu_size * date_rate/link_bw;
 	symbols_per_tu = (data_per_tu/10)&0xff;
-	frac_symbols_per_tu = (data_per_tu%10*16/10) & 0xf;
+	if (symbols_per_tu == 63)
+		frac_symbols_per_tu = 0;
+	else
+		frac_symbols_per_tu = (data_per_tu%10*16/10) & 0xf;
 	phytium_writel_reg(priv, frac_symbols_per_tu<<24 | symbols_per_tu<<16 | tu_size,
 			   group_offset, PHYTIUM_DP_TRANSFER_UNIT_SIZE);
 
@@ -2114,7 +2079,7 @@ phytium_dp_connector_unregister(struct drm_connector *connector)
 
 	if (phytium_dp->is_edp) {
 		phytium_edp_backlight_device_unregister(phytium_dp);
-		phytium_edp_panel_poweroff(phytium_dp);
+		phytium_edp_fini_connector(phytium_dp);
 	}
 	drm_dp_aux_unregister(&phytium_dp->aux);
 }
@@ -2235,14 +2200,73 @@ static void phytium_encoder_enable(struct drm_encoder *encoder)
 	}
 }
 
+enum drm_mode_status
+phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display_mode *mode)
+{
+	struct phytium_dp_device *phytium_dp = encoder_to_dp_device(encoder);
+	struct drm_display_info *display_info = &phytium_dp->connector.display_info;
+	unsigned int requested, actual;
+
+	switch (display_info->bpc) {
+	case 10:
+	case 6:
+	case 8:
+		break;
+	default:
+		DRM_INFO("not support bpc(%d)\n", display_info->bpc);
+		display_info->bpc = 8;
+		break;
+	}
+
+	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
+		DRM_INFO("not support color_format(%d)\n", display_info->color_formats);
+		display_info->color_formats = DRM_COLOR_FORMAT_RGB444;
+	}
+
+	requested = mode->clock * display_info->bpc * 3 / 1000;
+	actual = phytium_dp->max_link_rate * phytium_dp->max_link_lane_count / 100;
+	actual = actual * 8 / 10;
+	if (requested >= actual) {
+		DRM_DEBUG_KMS("requested=%d, actual=%d, clock=%d\n", requested, actual,
+				mode->clock);
+		return MODE_CLOCK_HIGH;
+	}
+
+	if (dc_fake_mode_enable &&
+		(phytium_dp->native_mode.clock == mode->clock) &&
+		(phytium_dp->native_mode.htotal == mode->htotal) &&
+		(phytium_dp->native_mode.vtotal == mode->vtotal))
+		return MODE_OK;
+
+	if ((mode->hdisplay == 1600) && (mode->vdisplay == 900))
+		return MODE_BAD_HVALUE;
+
+	if ((mode->hdisplay == 1024) && (mode->clock > 78000))
+		return MODE_BAD_HVALUE;
+
+	if ((mode->hdisplay < 640) || (mode->vdisplay < 480))
+		return MODE_BAD_HVALUE;
+
+	return MODE_OK;
+}
+
 static const struct drm_encoder_helper_funcs phytium_encoder_helper_funcs = {
 	.mode_set = phytium_dp_encoder_mode_set,
 	.disable = phytium_encoder_disable,
 	.enable  = phytium_encoder_enable,
+	.mode_valid = phytium_encoder_mode_valid,
 };
 
+void phytium_dp_encoder_destroy(struct drm_encoder *encoder)
+{
+	struct phytium_dp_device *phytium_dp = encoder_to_dp_device(encoder);
+
+	phytium_dp_audio_codec_fini(phytium_dp);
+	drm_encoder_cleanup(encoder);
+}
+
 static const struct drm_encoder_funcs phytium_encoder_funcs = {
-	.destroy = drm_encoder_cleanup,
+	.destroy = phytium_dp_encoder_destroy,
 };
 
 static const struct dp_audio_n_m phytium_dp_audio_n_m[] = {
@@ -2380,7 +2404,8 @@ static const struct hdmi_codec_ops phytium_audio_codec_ops = {
 	.hook_plugged_cb = phytium_dp_audio_hook_plugged_cb,
 };
 
-static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp, int port)
+static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp,
+				       const int port)
 {
 	struct device *dev = phytium_dp->dev->dev;
 	struct hdmi_codec_pdata codec_data = {
@@ -2392,10 +2417,18 @@ static int phytium_dp_audio_codec_init(struct phytium_dp_device *phytium_dp, int
 	};
 
 	phytium_dp->audio_pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
-							       port,
+							       codec_id + port,
 							       &codec_data, sizeof(codec_data));
 
 	return PTR_ERR_OR_ZERO(phytium_dp->audio_pdev);
+}
+
+static void phytium_dp_audio_codec_fini(struct phytium_dp_device *phytium_dp)
+{
+
+	if (!PTR_ERR_OR_ZERO(phytium_dp->audio_pdev))
+		platform_device_unregister(phytium_dp->audio_pdev);
+	phytium_dp->audio_pdev = NULL;
 }
 
 static long phytium_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
@@ -2470,8 +2503,16 @@ static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp)
 	phytium_edp_panel_poweron(phytium_dp);
 
 	status = phytium_dp_detect_dpcd(phytium_dp);
-	if (status == connector_status_disconnected)
+	if (status == connector_status_disconnected) {
+		DRM_ERROR("detect edp dpcd failed\n");
 		return false;
+	}
+
+	phytium_dp->edp_edid = drm_get_edid(connector, &phytium_dp->aux.ddc);
+	if (!phytium_dp->edp_edid) {
+		DRM_ERROR("get edp edid failed\n");
+		return false;
+	}
 
 	connector->status = status;
 	phytium_dp->max_link_rate = phytium_dp->common_rates[phytium_dp->num_common_rates-1];
@@ -2482,6 +2523,17 @@ static bool phytium_edp_init_connector(struct phytium_dp_device *phytium_dp)
 		       phytium_dp->max_link_lane_count, phytium_dp->max_link_rate);
 
 	return true;
+}
+
+static void phytium_edp_fini_connector(struct phytium_dp_device *phytium_dp)
+{
+	if (phytium_dp->edp_edid)
+		kfree(phytium_dp->edp_edid);
+
+	phytium_dp->edp_edid = NULL;
+	phytium_edp_panel_poweroff(phytium_dp);
+
+	return;
 }
 
 int phytium_dp_resume(struct drm_device *drm_dev)
