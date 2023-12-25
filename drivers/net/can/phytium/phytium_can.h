@@ -41,6 +41,9 @@ struct phytium_can_devtype {
 
 struct phytium_can_dev {
 	struct can_priv can;
+	unsigned int tx_head;
+	unsigned int tx_tail;
+	unsigned int tx_max;
 	struct napi_struct napi;
 	struct net_device *net;
 	struct device *dev;
