@@ -1209,12 +1209,12 @@ static irqreturn_t phytium_mci_irq(int irq, void *dev_id)
 		goto irq_out;
 	}
 
-	if ((events & MCI_MASKED_INTS_DTO) && (events & MCI_MASKED_INTS_CMD)) {
+	if (cmd && (events & MCI_MASKED_INTS_DTO) && (events & MCI_MASKED_INTS_CMD)) {
 		phytium_mci_cmd_done(host, events, mrq, cmd);
 		phytium_mci_data_xfer_done(host, (events & data_ints_mask) |
 					    (dmac_events & dmac_ints_mask), mrq, data);
-	} else if (events & MCI_MASKED_INTS_CMD ||
-		  ((events & MCI_INT_MASK_HTO) && (cmd->opcode == SD_SWITCH_VOLTAGE))) {
+	} else if (cmd && (events & MCI_MASKED_INTS_CMD ||
+		  ((events & MCI_INT_MASK_HTO) && (cmd->opcode == SD_SWITCH_VOLTAGE)))) {
 		phytium_mci_cmd_done(host, events, mrq, cmd);
 	} else if (events & MCI_MASKED_INTS_DTO) {
 		phytium_mci_data_xfer_done(host, (events & data_ints_mask) |
