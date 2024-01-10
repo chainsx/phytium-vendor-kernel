@@ -23,6 +23,71 @@
 
 #define HOST_EP_NUM	16
 
+static int get_epnum_from_pool(struct HOST_CTRL *priv, int real_epNum, bool dirIn)
+{
+	int index, dir = 0;
+	int ret = 0;
+
+	if (!priv)
+		return 0;
+
+	if (!dirIn)
+		dir = 1;
+
+	if (real_epNum <= MAX_INSTANCE_EP_NUM) {
+		if (!priv->ep_remap_pool[dir][real_epNum]) {
+			priv->ep_remap_pool[dir][real_epNum] = real_epNum;
+			ret = real_epNum;
+			goto out;
+		}
+
+		if (priv->ep_remap_pool[dir][real_epNum] == real_epNum) {
+			ret = real_epNum;
+			goto out;
+		}
+	} else {
+		for (index = 1; index <= MAX_INSTANCE_EP_NUM; index++) {
+			if (priv->ep_remap_pool[dir][index] == real_epNum) {
+				ret = index;
+				goto out;
+			}
+		}
+	}
+
+	for (index = 1; index <= MAX_INSTANCE_EP_NUM; index++) {
+		if (!priv->ep_remap_pool[dir][index]) {
+			priv->ep_remap_pool[dir][index] = real_epNum;
+			ret = index;
+			goto out;
+		}
+	}
+
+out:
+	return ret;
+}
+
+static int release_epnum_from_pool(struct HOST_CTRL *priv, int real_epNum, bool dirIn)
+{
+	int index = 0;
+	int dir = 0;
+
+	if (!priv)
+		return 0;
+
+	if (!dirIn)
+		dir = 1;
+
+	for (index = 1; index <= MAX_INSTANCE_EP_NUM; index++) {
+		if (priv->ep_remap_pool[dir][index] == real_epNum) {
+			priv->ep_remap_pool[dir][index] = 0;
+
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
 static inline struct HOST_REQ *getUsbRequestEntry(struct list_head *list)
 {
 	return (struct HOST_REQ *)((uintptr_t)list - (uintptr_t)&(((struct HOST_REQ *)0)->list));
@@ -85,6 +150,7 @@ static inline void disconnectHostDetect(struct HOST_CTRL *priv)
 	if (!priv)
 		return;
 
+	memset(priv->ep_remap_pool, 0, sizeof(priv->ep_remap_pool));
 	otgctrl = phytium_read8(&priv->regs->otgctrl);
 	if ((otgctrl & OTGCTRL_ASETBHNPEN) && priv->otgState == HOST_OTG_STATE_A_SUSPEND)
 		pr_info("Device no Response\n");
@@ -571,7 +637,7 @@ static void hostEpProgram(struct HOST_CTRL *priv, struct HostEp *hwEp,
 			phytium_write8(&priv->regs->ep[hwEp->hwEpNum - 1].txcon, regCon);
 			if (usbEpPriv->type != USB_ENDPOINT_XFER_ISOC) {
 				retval = priv->hostCallbacks.getEpToggle(priv,
-						usbReq->usbDev, usbEpPriv->epNum, 0);
+						usbReq->usbDev, usbHEp->device_epNum, 0);
 				if (retval) {
 					phytium_write8(&priv->regs->endprst, hwEp->hwEpNum |
 						ENDPRST_IO_TX);
@@ -592,7 +658,7 @@ static void hostEpProgram(struct HOST_CTRL *priv, struct HostEp *hwEp,
 					usbEpPriv->maxPacketSize);
 
 			phytium_write8(&priv->regs->epExt[hwEp->hwEpNum - 1].txctrl,
-					usbEpPriv->epNum);
+					usbHEp->device_epNum);
 
 			phytium_write8(&priv->regs->fnaddr, usbEpPriv->faddress);
 
@@ -629,7 +695,7 @@ static void hostEpProgram(struct HOST_CTRL *priv, struct HostEp *hwEp,
 			if (usbEpPriv->type != USB_ENDPOINT_XFER_ISOC) {
 				if (priv->hostCallbacks.getEpToggle) {
 					retval = priv->hostCallbacks.getEpToggle(priv,
-							usbReq->usbDev, usbEpPriv->epNum, 1);
+							usbReq->usbDev, usbHEp->device_epNum, 1);
 					if (retval) {
 						phytium_write8(&priv->regs->endprst, hwEp->hwEpNum);
 						phytium_write8(&priv->regs->endprst, hwEp->hwEpNum |
@@ -646,7 +712,7 @@ static void hostEpProgram(struct HOST_CTRL *priv, struct HostEp *hwEp,
 					usbEpPriv->maxPacketSize);
 
 			phytium_write8(&priv->regs->epExt[hwEp->hwEpNum - 1].rxctrl,
-					usbEpPriv->epNum);
+					usbHEp->device_epNum);
 
 			phytium_write8(&priv->regs->fnaddr, usbEpPriv->faddress);
 
@@ -837,7 +903,7 @@ static void scheduleNextTransfer(struct HOST_CTRL *priv,
 			endprst = (phytium_read8(&priv->regs->endprst) & ENDPRST_TOGSETQ) ? 1 : 0;
 			if (priv->hostCallbacks.setEpToggle)
 				priv->hostCallbacks.setEpToggle(priv, usbReq->usbDev,
-						usbHEpPriv->epNum, usbHEpPriv->isIn, endprst);
+						usbEp->device_epNum, usbHEpPriv->isIn, endprst);
 		} else {
 			if (waitForBusyBit(priv, hwEp) > 0) {
 				usbReq->status = HOST_ESHUTDOWN;
@@ -849,7 +915,7 @@ static void scheduleNextTransfer(struct HOST_CTRL *priv,
 			endprst = (phytium_read8(&priv->regs->endprst) & ENDPRST_TOGSETQ) ? 1 : 0;
 			if (priv->hostCallbacks.setEpToggle)
 				priv->hostCallbacks.setEpToggle(priv, usbReq->usbDev,
-						usbHEpPriv->epNum, usbHEpPriv->isIn, endprst);
+						usbEp->device_epNum, usbHEpPriv->isIn, endprst);
 		}
 		break;
 	}
@@ -1169,9 +1235,8 @@ static void host_endpoint_update(struct phytium_cusb *config,
 	if (!config || !udev || !ep)
 		return;
 
-	epnum = usb_endpoint_num(&ep->desc);
-	if (epnum > MAX_INSTANCE_EP_NUM)
-		epnum = MAX_INSTANCE_EP_NUM;
+	epnum = get_epnum_from_pool(config->host_priv, usb_endpoint_num(&ep->desc),
+			usb_endpoint_dir_in(&ep->desc));
 
 	if (usb_endpoint_dir_out(&ep->desc)) {
 		if (udev->out_ep[epnum] == NULL) {
@@ -1243,9 +1308,8 @@ static int hc_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 
 	req->isoFramesDesc = NULL;
 	req->isoFramesNumber = urb->number_of_packets;
-	req->epNum = usb_endpoint_num(host_ep_desc);
-	if (req->epNum > MAX_INSTANCE_EP_NUM)
-		req->epNum = MAX_INSTANCE_EP_NUM;
+	req->epNum = get_epnum_from_pool(config->host_priv, usb_endpoint_num(host_ep_desc),
+			usb_endpoint_dir_in(host_ep_desc));
 
 	if (usb_endpoint_dir_in(host_ep_desc)) {
 		if (!usbDev->in_ep[req->epNum])
@@ -1280,6 +1344,7 @@ static int hc_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	req->status = EINPROGRESS;
 	req->usbDev = &usbDev->udev;
 	req->usbEp = req->epIsIn ? usbDev->in_ep[req->epNum] : usbDev->out_ep[req->epNum];
+	req->usbEp->device_epNum = usb_endpoint_num(host_ep_desc);
 	if (!req->epNum)
 		usbDev->ep0_hep.desc.wMaxPacketSize = urb->dev->ep0.desc.wMaxPacketSize;
 
@@ -1321,6 +1386,10 @@ static int hc_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		goto err_giveback;
 
 	ret = config->host_obj->host_reqDequeue(priv, urb->hcpriv, status);
+
+	release_epnum_from_pool(config->host_priv, usb_pipeendpoint(urb->pipe),
+			usb_pipein(urb->pipe));
+
 	kfree(urb->hcpriv);
 	urb->hcpriv = NULL;
 done:
@@ -1338,10 +1407,15 @@ err_giveback:
 static void hc_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoint *ld_ep)
 {
 	struct HOST_USB_DEVICE *usbDev;
-	int ep_num = usb_endpoint_num(&ld_ep->desc);
+	int ep_num;
+	struct phytium_cusb *config;
 
-	if (ep_num > MAX_INSTANCE_EP_NUM)
-		ep_num = MAX_INSTANCE_EP_NUM;
+	config = *(struct phytium_cusb **)hcd->hcd_priv;
+	if (!config)
+		return;
+
+	ep_num = get_epnum_from_pool(config->host_priv, usb_endpoint_num(&ld_ep->desc),
+			usb_endpoint_dir_in(&ld_ep->desc));
 
 	usbDev = (struct HOST_USB_DEVICE *)ld_ep->hcpriv;
 	if (!usbDev)
@@ -1349,14 +1423,14 @@ static void hc_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoint *l
 
 	if (ld_ep->desc.bEndpointAddress) {
 		if (usb_endpoint_dir_in(&ld_ep->desc)) {
-			if (!usbDev->in_ep[ep_num]) {
+			if (usbDev->in_ep[ep_num]) {
 				usbDev->in_ep[ep_num]->userExt = NULL;
 				INIT_LIST_HEAD(&usbDev->in_ep[ep_num]->reqList);
 				kfree(usbDev->in_ep[ep_num]);
 				usbDev->in_ep[ep_num] = NULL;
 			}
 		} else {
-			if (!usbDev->out_ep[ep_num]) {
+			if (usbDev->out_ep[ep_num]) {
 				usbDev->out_ep[ep_num]->userExt = NULL;
 				INIT_LIST_HEAD(&usbDev->out_ep[ep_num]->reqList);
 				kfree(usbDev->out_ep[ep_num]);
@@ -1699,6 +1773,7 @@ static uint32_t initEndpoints(struct HOST_CTRL *priv)
 	priv->hwEpOutCount = 0;
 	phytium_write8(&priv->regs->ep0fifoctrl, FIFOCTRL_FIFOAUTO | 0);
 	phytium_write8(&priv->regs->ep0fifoctrl, FIFOCTRL_FIFOAUTO | FIFOCTRL_IO_TX | 0);
+	memset(priv->ep_remap_pool, 0, sizeof(priv->ep_remap_pool));
 
 	for (epNum = 0; epNum < HOST_EP_NUM; epNum++) {
 		priv->in[epNum].isInEp = 1;
