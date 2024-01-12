@@ -1917,8 +1917,7 @@ int32_t hostEpDisable(struct HOST_CTRL *priv, struct HOST_EP *ep)
 	return 0;
 }
 
-unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
-		int speed)
+unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc, int speed)
 {
 	unsigned int interval = 0;
 
@@ -1932,7 +1931,7 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = 1 << interval;
 			if (interval != desc.bInterval)
 				pr_debug("rounding to %d microframes, desc %d microframes\n",
-						interval, desc.bInterval);
+					interval, desc.bInterval);
 			break;
 		}
 
@@ -1941,16 +1940,15 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = 1 << interval;
 			if (interval != desc.bInterval - 1)
 				pr_debug("rounding to %d %sframes\n", interval,
-						speed == USB_SPEED_FULL ? "" : "micro");
+					speed == USB_SPEED_FULL ? "" : "micro");
 		}
 		break;
 	case USB_SPEED_FULL:
 		if (usb_endpoint_xfer_isoc(&desc)) {
-			interval = clamp_val(desc.bInterval, 1, 16) - 1;
-			if (interval != desc.bInterval - 1)
+			interval = clamp_val(desc.bInterval, 1, 16);
+			if (interval != desc.bInterval)
 				pr_debug("rounding to %d %sframes\n", 1 << interval,
-						speed == USB_SPEED_FULL ? "" : "micro");
-			interval += 3;
+					speed == USB_SPEED_FULL ? "" : "micro");
 			break;
 		}
 		fallthrough;
@@ -1960,7 +1958,7 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = clamp_val(interval, 3, 10);
 			if ((1 << interval) != desc.bInterval * 8)
 				pr_debug("rounding to %d microframes, desc %d microframes\n",
-						1 << interval, desc.bInterval);
+					1 << interval, desc.bInterval);
 		}
 	}
 
