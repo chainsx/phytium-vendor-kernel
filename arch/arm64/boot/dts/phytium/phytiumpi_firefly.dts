@@ -262,7 +262,7 @@
 
 &mmc1 {
 	bus-width = <0x00000004>;
-	max-frequency = <25000000>;
+	max-frequency = <50000000>;
 	cap-sdio-irq;
 	cap-sd-highspeed;
 	no-mmc;
