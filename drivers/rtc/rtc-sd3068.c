@@ -211,7 +211,7 @@ static int sd3068_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	ret = rtc_register_device(sd3068->rtc);
+	ret = devm_rtc_register_device(sd3068->rtc);
 	if (ret)
 		return ret;
 
