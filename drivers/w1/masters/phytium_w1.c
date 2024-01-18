@@ -624,6 +624,7 @@ static const struct acpi_device_id phytium_w1m_acpi_ids[] = {
 	{ "PHYT0034", 0 },
 	{ }
 };
+MODULE_DEVICE_TABLE(acpi, phytium_w1m_acpi_ids);
 #endif
 
 static struct platform_driver phytium_w1m_driver = {
