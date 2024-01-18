@@ -130,7 +130,8 @@ static int homo_rproc_stop(struct rproc *rproc)
 	return 0;
 }
 
-static void *homo_rproc_da_to_va(struct rproc *rproc, u64 da, size_t len)
+static void *homo_rproc_da_to_va(struct rproc *rproc, u64 da, size_t len,
+		bool *is_iomem)
 {
 	struct homo_rproc *priv = rproc->priv;
 
