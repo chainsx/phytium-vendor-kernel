@@ -840,7 +840,6 @@ static int azx_first_init(struct azx *chip)
 	unsigned int dma_bits = 64;
 
 	struct resource *res;
-	const struct acpi_device_id *match;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	hda->regs = devm_ioremap_resource(hddev, res);
