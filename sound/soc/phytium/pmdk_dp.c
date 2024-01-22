@@ -131,12 +131,14 @@ static struct snd_soc_dai_link pmdk_dai_local[] = {
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp0_init,
+	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp0_dai),
 },{
 	.name = "Phytium dp1-audio",
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp1_init,
+	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp1_dai),
 },
 {
@@ -144,6 +146,7 @@ static struct snd_soc_dai_link pmdk_dai_local[] = {
 	.stream_name = "Playback",
 	.dai_fmt = SMDK_DAI_FMT,
 	.init = pmdk_dp2_init,
+	.playback_only = true,
 	SND_SOC_DAILINK_REG(pmdk_dp2_dai),
 },
 };
