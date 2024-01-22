@@ -28,9 +28,7 @@ static const struct fb_ops phytium_fbdev_ops = {
 	.owner = THIS_MODULE,
 	 DRM_FB_HELPER_DEFAULT_OPS,
 	.fb_mmap = phytium_fbdev_mmap,
-	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-	.fb_imageblit = drm_fb_helper_cfb_imageblit,
+	__FB_DEFAULT_DMAMEM_OPS_DRAW,
 };
 
 static int
@@ -67,7 +65,7 @@ phytium_drm_fbdev_create(struct drm_fb_helper *helper, struct drm_fb_helper_surf
 	}
 	mutex_unlock(&dev->struct_mutex);
 
-	fbi = drm_fb_helper_alloc_fbi(helper);
+	fbi = drm_fb_helper_alloc_info(helper);
 	if (IS_ERR(fbi)) {
 		DRM_DEV_ERROR(dev->dev, "Failed to create framebuffer info.");
 		ret = PTR_ERR(fbi);
@@ -83,7 +81,6 @@ phytium_drm_fbdev_create(struct drm_fb_helper *helper, struct drm_fb_helper_surf
 
 	helper->fb = &(phytium_fb->base);
 	fbi->par = helper;
-	fbi->flags = FBINFO_FLAG_DEFAULT;
 	fbi->fbops = &phytium_fbdev_ops;
 
 	fb = helper->fb;
@@ -91,7 +88,6 @@ phytium_drm_fbdev_create(struct drm_fb_helper *helper, struct drm_fb_helper_surf
 
 	offset = fbi->var.xoffset * bytes_per_pixel;
 	offset += fbi->var.yoffset * fb->pitches[0];
-	dev->mode_config.fb_base = 0;
 	fbi->screen_base = priv->fbdev_phytium_gem->vaddr + offset;
 	fbi->screen_size = priv->fbdev_phytium_gem->base.size;
 	fbi->fix.smem_len = priv->fbdev_phytium_gem->base.size;
@@ -119,7 +115,7 @@ int phytium_drm_fbdev_init(struct drm_device *dev)
 		return -EINVAL;
 
 	helper = &priv->fbdev_helper;
-	drm_fb_helper_prepare(dev, helper, &phytium_drm_fb_helper_funcs);
+	drm_fb_helper_prepare(dev, helper, 32, &phytium_drm_fb_helper_funcs);
 
 	ret = drm_fb_helper_init(dev, helper);
 	if (ret < 0) {
@@ -127,7 +123,7 @@ int phytium_drm_fbdev_init(struct drm_device *dev)
 		return ret;
 	}
 
-	ret = drm_fb_helper_initial_config(helper, 32);
+	ret = drm_fb_helper_initial_config(helper);
 	return 0;
 }
 
@@ -137,7 +133,7 @@ void phytium_drm_fbdev_fini(struct drm_device *dev)
 	struct drm_fb_helper *helper;
 
 	helper = &priv->fbdev_helper;
-	drm_fb_helper_unregister_fbi(helper);
+	drm_fb_helper_unregister_info(helper);
 
 	if (helper->fb)
 		drm_framebuffer_put(helper->fb);

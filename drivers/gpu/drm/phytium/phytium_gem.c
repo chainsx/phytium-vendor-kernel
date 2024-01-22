@@ -366,7 +366,7 @@ int phytium_gem_mmap_obj(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	 * vm_pgoff (used as a fake buffer offset by DRM) to 0 as we want to map
 	 * the whole buffer.
 	 */
-	vma->vm_flags &= ~VM_PFNMAP;
+	vm_flags_clear(vma, VM_PFNMAP);
 	vma->vm_pgoff = 0;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 
