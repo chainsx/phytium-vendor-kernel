@@ -422,7 +422,7 @@ int phytium_spi_add_host(struct device *dev, struct phytium_spi *fts)
 	master->max_speed_hz = fts->max_freq;
 	master->dev.of_node = dev->of_node;
 	master->dev.fwnode = dev->fwnode;
-	master->flags = SPI_MASTER_GPIO_SS;
+	master->flags = SPI_CONTROLLER_GPIO_SS;
 
 	spi_hw_init(dev, fts);
 

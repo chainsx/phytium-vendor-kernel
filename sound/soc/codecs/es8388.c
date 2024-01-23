@@ -791,8 +791,7 @@ static struct acpi_device_id es8388_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, es8388_acpi_match);
 
-static int es8388_i2c_probe(struct i2c_client *i2c,
-			    const struct i2c_device_id *id)
+static int es8388_i2c_probe(struct i2c_client *i2c)
 {
 	return es8388_probe(&i2c->dev,
 			devm_regmap_init_i2c(i2c, &es8388_regmap_config));

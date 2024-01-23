@@ -956,8 +956,7 @@ static const struct snd_soc_component_driver soc_component_dev_es8336 = {
 	.num_dapm_routes = ARRAY_SIZE(es8336_dapm_routes),
 };
 
-static int es8336_i2c_probe(struct i2c_client *i2c,
-			    const struct i2c_device_id *id)
+static int es8336_i2c_probe(struct i2c_client *i2c)
 {
 	struct es8336_priv *es8336;
 	struct gpio_desc *gpiod;

@@ -8,6 +8,7 @@
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/bitops.h>
+#include <linux/seq_file.h>
 
 #include "gpio-phytium-core.h"
 
