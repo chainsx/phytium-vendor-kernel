@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Platform CAN bus driver for Phytium CAN controller
  *
- * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
  */
 
 #include <linux/pci.h>
@@ -76,10 +76,6 @@ static int phytium_can_pci_probe(struct pci_dev *pdev, const struct pci_device_i
 	cdev->can.clock.freq = cfg->clock_freq;
 	cdev->tx_fifo_depth = cfg->tx_fifo_depth;
 
-	cdev->tx_head = 0;
-	cdev->tx_tail = 0;
-	cdev->tx_max = cfg->tx_fifo_depth;
-
 	cdev->base = priv->base;
 	cdev->net->irq = pdev->irq;
 
@@ -90,7 +86,7 @@ static int phytium_can_pci_probe(struct pci_dev *pdev, const struct pci_device_i
 	ret = pm_runtime_get_sync(cdev->dev);
 	if (ret < 0) {
 		netdev_err(cdev->net, "%s: pm_runtime_get failed(%d)\n",
-					__func__, ret);
+			   __func__, ret);
 		goto err_pmdisable;
 	}
 	ret = phytium_can_register(cdev);
@@ -148,5 +144,5 @@ static struct pci_driver phytium_can_pci_driver = {
 module_pci_driver(phytium_can_pci_driver);
 
 MODULE_AUTHOR("Cheng Quan <chengquan@phytium.com.cn");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Phytium CAN driver for PCI-based controllers");
