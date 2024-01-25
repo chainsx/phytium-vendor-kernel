@@ -1337,7 +1337,6 @@ static int phytium_i2s_probe(struct platform_device *pdev)
 	err = i2s_phytium_create(pdev, card_num, &chip, i2s);
 	if (err < 0)
 		return err;
-	i2s = container_of(chip, struct i2s_phytium, chip);
 	schedule_probe = !chip->disabled;
 
 	dev_set_drvdata(&pdev->dev, i2s);
