@@ -23,7 +23,7 @@ enum phytium_can_reg {
 	CAN_ACC_ID2_MASK	= 0x28,		/* Acceptance identifier2 mask register */
 	CAN_ACC_ID3_MASK	= 0x2c,		/* Acceptance identifier3 mask register */
 	CAN_XFER_STS		= 0x30,		/* Transfer status register */
-	CAN_ERR_CNT		= 0x34,		/* Error counter register */
+	CAN_ERROR_CNT		= 0x34,		/* Error counter register */
 	CAN_FIFO_CNT		= 0x38,		/* FIFO counter register */
 	CAN_DMA_CTRL		= 0x3c,		/* DMA request control register */
 	CAN_XFER_EN		= 0x40,		/* Transfer enable register */
@@ -304,8 +304,8 @@ static int phytium_can_get_berr_counter(const struct net_device *dev,
 {
 	struct phytium_can_dev *cdev = netdev_priv(dev);
 
-	bec->rxerr = phytium_can_read(cdev, CAN_ERR_CNT) & ERR_CNT_REC;
-	bec->txerr = (phytium_can_read(cdev, CAN_ERR_CNT) & ERR_CNT_TEC) >> 16;
+	bec->rxerr = phytium_can_read(cdev, CAN_ERROR_CNT) & ERR_CNT_REC;
+	bec->txerr = (phytium_can_read(cdev, CAN_ERROR_CNT) & ERR_CNT_TEC) >> 16;
 
 	return 0;
 }
@@ -413,9 +413,6 @@ static int phytium_can_do_rx_poll(struct net_device *dev, int quota)
 		netdev_dbg(dev, "Next received %d frame again.\n", rxfs);
 	}
 
-	if (pkts)
-		can_led_event(dev, CAN_LED_EVENT_RX);
-
 	return pkts;
 }
 
@@ -452,6 +449,7 @@ static void phytium_can_write_frame(struct phytium_can_dev *cdev)
 	struct sk_buff *skb = cdev->tx_skb;
 	u32 i, id, dlc = 0, frame_head[2] = {0, 0};
 	u32 data_len;
+	unsigned int len;
 
 	data_len = can_fd_len2dlc(cf->len);
 	cdev->tx_skb = NULL;
@@ -546,7 +544,7 @@ static void phytium_can_write_frame(struct phytium_can_dev *cdev)
 	netdev_dbg(dev, "Trigger send message!\n");
 
 	can_put_echo_skb(skb, dev, 0, 0);
-	can_get_echo_skb(dev, 0, NULL);
+	len = can_get_echo_skb(dev, 0, NULL);
 	return;
 }
 
@@ -617,9 +615,6 @@ static void phytium_can_tx_interrupt(struct net_device *ndev, u32 isr)
 
 	phytium_can_set_reg_bits(cdev, CAN_INTR, (INTR_BOIE |
 				 INTR_PWIE | INTR_PEIE));
-
-	can_led_event(ndev, CAN_LED_EVENT_TX);
-
 }
 
 static void phytium_can_tx_done_timeout(struct timer_list *t)
@@ -656,8 +651,8 @@ static void phytium_can_err_interrupt(struct net_device *ndev, u32 isr)
 
 	skb = alloc_can_err_skb(ndev, &cf);
 
-	rxerr = phytium_can_read(cdev, CAN_ERR_CNT) & ERR_CNT_REC;
-	txerr = ((phytium_can_read(cdev, CAN_ERR_CNT) & ERR_CNT_TEC) >> 16);
+	rxerr = phytium_can_read(cdev, CAN_ERROR_CNT) & ERR_CNT_REC;
+	txerr = ((phytium_can_read(cdev, CAN_ERROR_CNT) & ERR_CNT_TEC) >> 16);
 
 	if (isr & INTR_BOIS) {
 		netdev_dbg(ndev, "bus_off %s: txerr :%u rxerr :%u\n",
@@ -988,7 +983,6 @@ static int phytium_can_open(struct net_device *dev)
 
 	netdev_dbg(dev, "%s is going on\n", __func__);
 
-	can_led_event(dev, CAN_LED_EVENT_OPEN);
 	napi_enable(&cdev->napi);
 	cdev->is_stop_queue_flag = STOP_QUEUE_FALSE;
 	netif_start_queue(dev);
@@ -1021,7 +1015,6 @@ static int phytium_can_close(struct net_device *dev)
 	pm_runtime_put_sync(cdev->dev);
 
 	close_candev(dev);
-	can_led_event(dev, CAN_LED_EVENT_STOP);
 
 	return 0;
 }
@@ -1062,7 +1055,7 @@ static int phytium_can_dev_setup(struct phytium_can_dev *cdev)
 {
 	struct net_device *dev = cdev->net;
 
-	netif_napi_add(dev, &cdev->napi, phytium_can_poll, 64);
+	netif_napi_add(dev, &cdev->napi, phytium_can_poll);
 
 	cdev->can.do_set_mode = phytium_can_set_mode;
 	cdev->can.do_get_berr_counter = phytium_can_get_berr_counter;
@@ -1128,8 +1121,6 @@ int phytium_can_register(struct phytium_can_dev *cdev)
 	cdev->is_tx_done = true;
 	cdev->is_need_stop_xmit = false;
 	timer_setup(&cdev->timer, phytium_can_tx_done_timeout, 0);
-
-	devm_can_led_init(cdev->net);
 
 	dev_info(cdev->dev, "%s device registered (irq=%d)\n",
 		 KBUILD_MODNAME, cdev->net->irq);
