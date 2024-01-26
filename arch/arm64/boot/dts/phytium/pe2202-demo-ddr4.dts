@@ -9,6 +9,7 @@
 /memreserve/ 0x80000000 0x10000;
 
 #include "pe2202.dtsi"
+#include "dt-bindings/gpio/gpio.h"
 
 /{
 	model = "Pe2202 DEMO DDR4";
@@ -66,11 +67,45 @@
 		status = "okay";
 
 		codec0: es8336@10 {
+			det-gpios = <&gpio2 5  GPIO_ACTIVE_LOW>;
+			sel-gpios = <&gpio2 11 GPIO_ACTIVE_LOW>;
 			#sound-dai-cells = <0>;
 			compatible = "everest,es8336";
 			reg = <0x10>;
 		};
 	};
+};
+
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&gpio2 {
+    status = "okay";
+};
+
+&gpio3 {
+    status = "okay";
+};
+
+&gpio4 {
+    status = "okay";
+};
+
+&gpio5 {
+    status = "okay";
+};
+
+&watchdog0 {
+    status = "okay";
+};
+
+&watchdog1 {
+    status = "okay";
 };
 
 &pcie {
@@ -106,14 +141,32 @@
 	status = "okay";
 };
 
+/*
+ * In demo board, M.2 interface may insert two types of disks: PCIE (nvme protocol) or SATA (ahci protocol),
+ * so here enable 'sata0' node by default to correspond to the sata drive case. Pin multiplexing exists
+ * in PCIE2 and SATA0, when used as a boot disk, the BIOS can automatically recognize these two conditions.
+ */
+&sata0 {
+	status = "okay";
+};
+
 &sata1 {
 	status = "okay";
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash@0 {
+		status = "okay";
+	};
 };
 
 &spi2 {
 	dmas = <&ddma0 0 8>,
 	       <&ddma0 1 21>;
 	dma-names = "tx", "rx";
+	global-cs = <1>;
 	status = "okay";
 };
 
@@ -137,9 +190,10 @@
 
 &mmc0 {
 	bus-width = <0x00000008>;
-	max-frequency = <50000000>;
+	max-frequency = <100000000>;
 	cap-mmc-hw-reset;
 	cap-mmc-highspeed;
+	mmc-hs200-1_8v;
 	no-sdio;
 	no-sd;
 	non-removable;
@@ -151,7 +205,7 @@
 	max-frequency = <50000000>;
 	cap-sdio-irq;
 	cap-sd-highspeed;
-	sd-uhs-sdr25;
+	no-sdio;
 	no-mmc;
 	status = "okay";
 };
@@ -165,4 +219,14 @@
 	pipe_mask = /bits/ 8 <0x2>;
 	edp_mask = /bits/ 8 <0x0>;
 	status = "okay";
+};
+
+&i2s_dp1 {
+	status = "okay";
+};
+
+&pmdk_dp {
+    num-dp = <1>;
+    dp-mask = /bits/ 8 <0x2>;
+    status = "okay";
 };

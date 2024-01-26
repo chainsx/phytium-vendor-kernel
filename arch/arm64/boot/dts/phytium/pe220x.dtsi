@@ -208,11 +208,18 @@
 			reg = <0x0 0x28008000 0x0     0x1000>,
 			      <0x0        0x0 0x0 0x0fffffff>;
 			reg-names = "qspi", "qspi_mm";
-			clocks = <&sysclk_50mhz>;
+			clocks = <&sysclk_300mhz>;
 			status = "disabled";
 
 			#address-cells = <1>;
 			#size-cells = <0>;
+
+			flash@0 {
+				compatible = "jedec,spi-nor";
+				reg = <0x00>;
+				spi-rx-bus-width = <1>;
+				spi-max-frequency = <50000000>;
+			};
 		};
 
 		uart0: uart@2800c000 {
@@ -342,7 +349,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -374,7 +381,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -406,7 +413,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -423,7 +430,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -440,7 +447,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -457,7 +464,7 @@
 			porta {
 				compatible = "phytium,gpio-port";
 				reg = <0>;
-				nr-gpios = <16>;
+				ngpios = <16>;
 			};
 		};
 
@@ -535,22 +542,6 @@
 			compatible = "phytium,pwm";
 			reg = <0x0 0x2804b000 0x0 0x1000>;
 			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&sysclk_50mhz>;
-			status = "disabled";
-		};
-
-		pwm2: pwm@2804c000 {
-			compatible = "phytium,pwm";
-			reg = <0x0 0x2804c000 0x0 0x1000>;
-			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&sysclk_50mhz>;
-			status = "disabled";
-		};
-
-		pwm3: pwm@2804d000 {
-			compatible = "phytium,pwm";
-			reg = <0x0 0x2804d000 0x0 0x1000>;
-			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&sysclk_50mhz>;
 			status = "disabled";
 		};
@@ -913,6 +904,18 @@
 			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&sysclk_600mhz>;
 			clock-names = "i2s_clk";
+			dai-name = "phytium-i2s-dp0";
+			status = "disabled";
+		};
+
+		i2s_dp1: i2s_dp1@3200B000 {
+			compatible = "phytium,i2s";
+			reg = <0x0 0x3200B000 0x0 0x1000>,
+			      <0x0 0x3200A000 0x0 0x1000>;
+			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&sysclk_600mhz>;
+			clock-names = "i2s_clk";
+			dai-name = "phytium-i2s-dp1";
 			status = "disabled";
 		};
 

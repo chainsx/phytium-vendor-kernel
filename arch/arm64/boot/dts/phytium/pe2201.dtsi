@@ -112,6 +112,22 @@
 		status = "disabled";
 	};
 
+	pwm2: pwm@2804c000 {
+		compatible = "phytium,pwm";
+		reg = <0x0 0x2804c000 0x0 0x1000>;
+		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sysclk_50mhz>;
+		status = "disabled";
+	};
+
+	pwm3: pwm@2804d000 {
+		compatible = "phytium,pwm";
+		reg = <0x0 0x2804d000 0x0 0x1000>;
+		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sysclk_50mhz>;
+		status = "disabled";
+	};
+
 	pwm4: pwm@2804e000 {
 		compatible = "phytium,pwm";
 		reg = <0x0 0x2804e000 0x0 0x1000>;
