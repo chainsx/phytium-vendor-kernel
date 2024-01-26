@@ -1095,23 +1095,22 @@ static int stream_direction(struct azx *chip, unsigned char index)
 
 }
 
-void snd_i2s_stream_init(struct i2sc_bus *bus, struct i2s_stream *azx_dev,
+void snd_i2s_stream_init(struct i2sc_bus *bus, struct i2s_stream *stream,
 			  int idx, int direction, int tag)
 {
-	azx_dev->bus = bus;
-	azx_dev->sd_addr = bus->remap_addr;
+	stream->bus = bus;
+	stream->sd_addr = bus->remap_addr;
 
 	if (idx == 0)
-		azx_dev->sd_int_sta_mask = 1 << idx;
+		stream->sd_int_sta_mask = 1 << idx;
 	else
-		azx_dev->sd_int_sta_mask = 1 << 8;
+		stream->sd_int_sta_mask = 1 << 8;
 
-	azx_dev->index = idx;
-	azx_dev->direction = direction;
-	azx_dev->stream_tag = tag;
+	stream->index = idx;
+	stream->direction = direction;
+	stream->stream_tag = tag;
 
-	list_add_tail(&azx_dev->list, &bus->stream_list);
-
+	list_add_tail(&stream->list, &bus->stream_list);
 }
 
 int azx_i2s_init_streams(struct azx *chip)
