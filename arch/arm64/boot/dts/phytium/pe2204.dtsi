@@ -212,12 +212,4 @@
 		magic-packet;
 		status = "disabled";
 	};
-
-	vpu0: vpu@32b00000 {
-		compatible = "phytium,vpu";
-		reg = <0x0 0x32b00000 0x0 0x20000>;
-		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-		status = "disabled";
-	};
-
 };
