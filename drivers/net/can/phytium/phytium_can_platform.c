@@ -145,7 +145,15 @@ static int phytium_can_plat_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, cdev->net);
 
-	pm_runtime_enable(cdev->dev);
+	if (!pm_runtime_enabled(cdev->dev))
+		pm_runtime_enable(cdev->dev);
+	ret = pm_runtime_get_sync(cdev->dev);
+	if (ret < 0) {
+		netdev_err(cdev->net, "%s: pm_runtime_get failed(%d)\n",
+			   __func__, ret);
+		goto out_runtime_disable;
+	}
+
 	ret = phytium_can_register(cdev);
 	if (ret)
 		goto out_runtime_disable;
