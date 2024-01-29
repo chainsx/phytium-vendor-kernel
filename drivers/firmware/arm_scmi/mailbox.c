@@ -214,7 +214,7 @@ static int mailbox_chan_setup(struct scmi_chan_info *cinfo, struct device *dev,
 	}
 
 	ret = of_parse_phandle_with_args(cdev->of_node, "mboxes",
-					 "#mbox-cells", 1, &args);
+					 "#mbox-cells", tx ? 0 : p2a_chan, &args);
 	if (ret) {
 		dev_err(cdev, "failed to get SCMI %s mailbox\n", desc);
 		return ret;
