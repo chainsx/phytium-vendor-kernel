@@ -279,6 +279,7 @@ static const struct of_device_id display_of_match[] = {
 	},
 	{ }
 };
+MODULE_DEVICE_TABLE(of, display_of_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id display_acpi_ids[] = {
