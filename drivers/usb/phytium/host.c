@@ -778,6 +778,38 @@ static void hostStartReq(struct HOST_CTRL *priv, struct HOST_REQ *req)
 	}
 }
 
+static void abortTransfer(struct HOST_CTRL *priv,
+		struct HOST_REQ *usbReq, struct HostEp *hwEp)
+{
+	struct HOST_EP *usbEp;
+	struct HOST_EP_PRIV *usbHEpPriv;
+	uint32_t status;
+
+	if (!priv || !usbReq || !hwEp || !hwEp->scheduledUsbHEp)
+		return;
+
+	usbEp = hwEp->scheduledUsbHEp;
+	usbHEpPriv = (struct HOST_EP_PRIV *)usbEp->hcPriv;
+	if (!usbHEpPriv)
+		return;
+
+	status = (usbReq->status == EINPROGRESS) ? 0 : usbReq->status;
+	givebackRequest(priv, usbReq, status);
+
+	if (list_empty(&usbEp->reqList)) {
+		usbHEpPriv->epIsReady = 0;
+		usbHEpPriv->currentHwEp = NULL;
+		hwEp->scheduledUsbHEp = NULL;
+
+		if (hwEp->channel) {
+			priv->dmaDrv->dma_channelRelease(priv->dmaController, hwEp->channel);
+			hwEp->channel = NULL;
+		}
+
+		if (usb_endpoint_xfer_int(&usbEp->desc))
+			list_del(&usbHEpPriv->node);
+	}
+}
 
 static void scheduleNextTransfer(struct HOST_CTRL *priv,
 		struct HOST_REQ *usbReq, struct HostEp *hwEp)
@@ -1917,8 +1949,7 @@ int32_t hostEpDisable(struct HOST_CTRL *priv, struct HOST_EP *ep)
 	return 0;
 }
 
-unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
-		int speed)
+unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc, int speed)
 {
 	unsigned int interval = 0;
 
@@ -1932,7 +1963,7 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = 1 << interval;
 			if (interval != desc.bInterval)
 				pr_debug("rounding to %d microframes, desc %d microframes\n",
-						interval, desc.bInterval);
+					interval, desc.bInterval);
 			break;
 		}
 
@@ -1941,16 +1972,15 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = 1 << interval;
 			if (interval != desc.bInterval - 1)
 				pr_debug("rounding to %d %sframes\n", interval,
-						speed == USB_SPEED_FULL ? "" : "micro");
+					speed == USB_SPEED_FULL ? "" : "micro");
 		}
 		break;
 	case USB_SPEED_FULL:
 		if (usb_endpoint_xfer_isoc(&desc)) {
-			interval = clamp_val(desc.bInterval, 1, 16) - 1;
-			if (interval != desc.bInterval - 1)
+			interval = clamp_val(desc.bInterval, 1, 16);
+			if (interval != desc.bInterval)
 				pr_debug("rounding to %d %sframes\n", 1 << interval,
-						speed == USB_SPEED_FULL ? "" : "micro");
-			interval += 3;
+					speed == USB_SPEED_FULL ? "" : "micro");
 			break;
 		}
 	/* fall through */
@@ -1960,7 +1990,7 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc,
 			interval = clamp_val(interval, 3, 10);
 			if ((1 << interval) != desc.bInterval * 8)
 				pr_debug("rounding to %d microframes, desc %d microframes\n",
-						1 << interval, desc.bInterval);
+					1 << interval, desc.bInterval);
 		}
 	}
 
@@ -2053,8 +2083,6 @@ static int abortActuallyUsbRequest(struct HOST_CTRL *priv,
 {
 	struct HOST_EP_PRIV *usbEpPriv;
 	struct HostEp *hostEp;
-	uint16_t rxerrien = 0;
-	uint16_t txerrien = 0;
 	uint8_t rxcon, txcon;
 
 	if (!priv || !req || !usbEp)
@@ -2064,31 +2092,20 @@ static int abortActuallyUsbRequest(struct HOST_CTRL *priv,
 	hostEp = usbEpPriv->currentHwEp;
 
 	usbEpPriv->transferFinished = 1;
-
 	if (hostEp->isInEp) {
 		if (hostEp->hwEpNum) {
 			rxcon = phytium_read8(&priv->regs->ep[hostEp->hwEpNum - 1].rxcon);
 			rxcon = rxcon & (~BIT(7));
 			phytium_write8(&priv->regs->ep[hostEp->hwEpNum - 1].rxcon, rxcon);
 		}
-		rxerrien = phytium_read16(&priv->regs->rxerrien);
-		rxerrien &= ~(1 << hostEp->hwEpNum);
-		phytium_write16(&priv->regs->rxerrien, rxerrien);
-		phytium_write8(&priv->regs->endprst, ENDPRST_FIFORST |
-				ENDPRST_IO_TX | hostEp->hwEpNum);
 	} else {
 		if (hostEp->hwEpNum) {
 			txcon = phytium_read8(&priv->regs->ep[hostEp->hwEpNum - 1].txcon);
 			txcon = txcon & (~BIT(7));
 			phytium_write8(&priv->regs->ep[hostEp->hwEpNum - 1].txcon, txcon);
 		}
-		txerrien = phytium_read16(&priv->regs->txerrien);
-		txerrien &= ~(1 << hostEp->hwEpNum);
-		phytium_write16(&priv->regs->txerrien, txerrien);
-		phytium_write8(&priv->regs->endprst, ENDPRST_FIFORST | hostEp->hwEpNum);
 	}
-
-	scheduleNextTransfer(priv, req, hostEp);
+	abortTransfer(priv, req, hostEp);
 
 	return 0;
 }
