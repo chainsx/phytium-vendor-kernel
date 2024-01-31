@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Platform CAN bus driver for Phytium CAN controller
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
  */
 
 #include <linux/acpi.h>
@@ -71,7 +71,6 @@ static const struct of_device_id phytium_can_of_ids[] = {
 MODULE_DEVICE_TABLE(of, phytium_can_of_ids);
 #endif
 
-
 static int phytium_can_plat_probe(struct platform_device *pdev)
 {
 	struct phytium_can_dev *cdev;
@@ -81,7 +80,7 @@ static int phytium_can_plat_probe(struct platform_device *pdev)
 	const struct phytium_can_devtype *devtype = &phytium_can_data;
 	u32 tx_fifo_depth;
 	int ret;
-	const char *mode;
+	const char *str = "can";
 
 	ret = fwnode_property_read_u32(dev_fwnode(&pdev->dev), "tx-fifo-depth", &tx_fifo_depth);
 	if (ret)
@@ -122,16 +121,11 @@ static int phytium_can_plat_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "failed to get clock frequency.\n");
 			goto fail;
 		}
-		ret = fwnode_property_read_string(dev_fwnode(&pdev->dev), "mode-select", &mode);
-		if (ret < 0) {
-			dev_info(&pdev->dev, "get mode-select ret: %d\n", ret);
-		}
-		else {
-			if (strncmp("canfd", mode, strlen("canfd")) == 0) {
-				dev_info(&pdev->dev, "use mode-select: canfd\n");
-				devtype = &phytium_canfd_data;
-			}
-		}
+
+		fwnode_property_read_string(dev_fwnode(&pdev->dev),
+					    "mode-select", &str);
+		if (!(strcmp(str, "canfd")))
+			devtype = &phytium_canfd_data;
 	}
 
 	cdev->tx_fifo_depth = tx_fifo_depth;
