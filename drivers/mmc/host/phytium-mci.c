@@ -293,7 +293,7 @@ u32 phytium_mci_cmd_prepare_raw_cmd(struct phytium_mci_host *host,
 			rawcmd |= (0x1 << 10);
 	}
 
-	return (rawcmd | (0x1 << 29) | (0x1 << 31));
+	return (rawcmd | (0x1 << 31));
 }
 
 static inline void
@@ -1163,8 +1163,7 @@ static irqreturn_t phytium_mci_irq(int irq, void *dev_id)
 		__phytium_mci_enable_sdio_irq(host, 0);
 	}
 
-
-	writel(events, host->base + MCI_RAW_INTS);
+	writel((events & event_mask), host->base + MCI_RAW_INTS);
 	writel(dmac_events, host->base + MCI_DMAC_STATUS);
 	spin_unlock_irqrestore(&host->lock, flags);
 
