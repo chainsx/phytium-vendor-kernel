@@ -1064,9 +1064,11 @@ static void phytmac_mac_interface_config(struct phytmac *pdata, unsigned int mod
 		PHYTMAC_WRITE(pdata, PHYTMAC_NCONFIG, config);
 
 	/* Disable AN for SGMII fixed link configuration, enable otherwise.*/
-	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
-	    state->interface == PHY_INTERFACE_MODE_2500BASEX)
+	if (state->interface == PHY_INTERFACE_MODE_SGMII)
 		phytmac_enable_autoneg(pdata, mode == MLO_AN_FIXED ? 0 : 1);
+
+	if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
+		phytmac_enable_autoneg(pdata, 0);
 }
 
 static unsigned int phytmac_pcs_get_link(struct phytmac *pdata,
