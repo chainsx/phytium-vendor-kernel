@@ -45,6 +45,26 @@
 					};
 			};
 		};
+
+		sensor1 {
+			trips {
+				threshod1: trip-point@0 {
+					temperature = <75000>;
+					hysteresis = <0>;
+					type = "passive";
+				};
+				target1: trip-point@1 {
+					temperature = <90000>;
+					hysteresis = <0>;
+					type = "passive";
+				};
+				cpu_crit1: cpu_crit {
+					temperature = <100000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+		};
 };
 
 &cpu {
