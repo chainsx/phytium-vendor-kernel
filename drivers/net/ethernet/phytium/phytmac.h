@@ -38,6 +38,8 @@
 #define MIN_TX_RING_SIZE		64
 #define MIN_RX_RING_SIZE		64
 #define DEFAULT_TX_DESC_MIN_FREE	64
+#define DEFAULT_RX_DESC_MIN_FREE       64
+
 #define MEMORY_SIZE			4096
 #define MHU_SIZE			0x20
 
@@ -112,8 +114,7 @@
 #define PHYTMAC_INT_RX_COMPLETE		0x4
 #define PHYTMAC_INT_RX_OVERRUN		0x8
 #define PHYTMAC_INT_RX_DESC_FULL	0x10
-#define PHYTMAC_RX_INT_FLAGS	(PHYTMAC_INT_RX_COMPLETE	\
-				| PHYTMAC_INT_RX_OVERRUN)
+#define PHYTMAC_RX_INT_FLAGS	(PHYTMAC_INT_RX_COMPLETE)
 #define PHYTMAC_TX_INT_FLAGS	(PHYTMAC_INT_TX_COMPLETE	\
 				| PHYTMAC_INT_TX_ERR)
 
@@ -494,7 +495,8 @@ struct phytmac_hw_if {
 	unsigned int (*tx_map)(struct phytmac_queue *pdata, u32 tx_tail,
 			       struct packet_info *packet);
 	void (*init_rx_map)(struct phytmac_queue *queue, u32 index);
-	unsigned int (*rx_map)(struct phytmac_queue *pdata, u32 index, dma_addr_t addr);
+	unsigned int (*rx_map)(struct phytmac_queue *queue, u32 index, dma_addr_t addr);
+	unsigned int (*rx_clean)(struct phytmac_queue *queue, u32 cleaned_count);
 	void (*transmit)(struct phytmac_queue *queue);
 	void (*restart)(struct phytmac *pdata);
 	int (*tx_complete)(const struct phytmac_dma_desc *desc);

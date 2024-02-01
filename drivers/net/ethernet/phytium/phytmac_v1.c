@@ -297,8 +297,8 @@ static void phytmac_reset_hw(struct phytmac *pdata)
 		} else {
 			PHYTMAC_WRITE(pdata, PHYTMAC_IDR(q - 1), -1);
 			PHYTMAC_WRITE(pdata, PHYTMAC_ISR(q - 1), -1);
-			PHYTMAC_WRITE(pdata, PHYTMAC_TXPTR(q - 1), -1);
-			PHYTMAC_WRITE(pdata, PHYTMAC_RXPTR(q - 1), -1);
+			PHYTMAC_WRITE(pdata, PHYTMAC_TXPTR(q - 1), 1);
+			PHYTMAC_WRITE(pdata, PHYTMAC_RXPTR(q - 1), 1);
 		}
 
 		PHYTMAC_WRITE(pdata, PHYTMAC_TXPTRH(q), 0);
@@ -885,14 +885,23 @@ static unsigned int phytmac_rx_map_desc(struct phytmac_queue *queue,
 			addr |= PHYTMAC_BIT(RX_WRAP);
 		desc->desc1 = 0;
 		desc->desc2 = upper_32_bits(addr);
-		/* Make newly descriptor to hardware */
-		dma_wmb();
-		desc->desc0 = lower_32_bits(addr);
-	} else {
-		desc->desc1 = 0;
-		/* Make newly descriptor to hardware */
-		dma_wmb();
+		desc->desc0 = lower_32_bits(addr) | PHYTMAC_BIT(RX_USED);
+	}
+
+	return 0;
+}
+
+static unsigned int phytmac_rx_clean_desc(struct phytmac_queue *queue, u32 count)
+{
+	struct phytmac_dma_desc *desc;
+	u32 index = queue->rx_head + count - 1;
+
+	while (count) {
+		desc = phytmac_get_rx_desc(queue, index);
 		desc->desc0 &= ~PHYTMAC_BIT(RX_USED);
+		dma_wmb();
+		index--;
+		count--;
 	}
 
 	return 0;
@@ -1095,15 +1104,15 @@ static void phytmac_clear_tx_desc(struct phytmac_queue *queue)
 
 static void phytmac_get_hw_stats(struct phytmac *pdata)
 {
-	u32 stats[44];
+	u32 stats[45];
 	int i, j;
 	u64 val;
 	u64 *p = &pdata->stats.tx_octets;
 
-	for (i = 0 ; i < 44; i++)
+	for (i = 0 ; i < 45; i++)
 		stats[i] = PHYTMAC_READ(pdata, PHYTMAC_OCTTX + i * 4);
 
-	for (i = 0, j = 0; i < 44; i++) {
+	for (i = 0, j = 0; i < 45; i++) {
 		if (i == 0 || i == 20) {
 			val = (u64)stats[i + 1] << 32 | stats[i];
 			*p += val;
@@ -1325,6 +1334,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	.get_desc_addr = phytmac_get_desc_addr,
 	.init_rx_map = phytmac_init_rx_map_desc,
 	.rx_map = phytmac_rx_map_desc,
+	.rx_clean = phytmac_rx_clean_desc,
 	.rx_checksum = phytmac_rx_checksum,
 	.rx_single_buffer = phytmac_rx_single_buffer,
 	.rx_pkt_start = phytmac_rx_sof,

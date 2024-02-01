@@ -382,7 +382,7 @@ static int phytmac_get_link_ksettings(struct net_device *ndev,
 			kset->base.speed = SPEED_10000;
 		}  else if (pdata->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
 			supported = SUPPORTED_2500baseX_Full | SUPPORTED_Pause;
-			advertising = SUPPORTED_2500baseX_Full | ADVERTISED_Pause;
+			advertising = ADVERTISED_2500baseX_Full | ADVERTISED_Pause;
 			kset->base.port = PORT_FIBRE;
 			kset->base.transceiver = XCVR_INTERNAL;
 			kset->base.duplex = DUPLEX_FULL;

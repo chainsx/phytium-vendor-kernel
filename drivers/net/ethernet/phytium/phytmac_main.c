@@ -40,7 +40,7 @@
 #include "phytmac_ptp.h"
 
 static int debug;
-module_param(debug, int, 0644);
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
 #define RX_BUFFER_MULTIPLE	64  /* bytes */
@@ -362,7 +362,7 @@ static int phytmac_alloc_tx_resource(struct phytmac *pdata)
 				    q, size, (unsigned long)queue->tx_ring_addr);
 
 		size = pdata->tx_ring_size * sizeof(struct phytmac_tx_skb);
-		queue->tx_skb = kmalloc(size, GFP_KERNEL);
+		queue->tx_skb = kzalloc(size, GFP_KERNEL);
 		if (!queue->tx_skb)
 			goto err;
 
@@ -676,13 +676,15 @@ static void phytmac_rx_clean(struct phytmac_queue *queue)
 	unsigned int index, space;
 	dma_addr_t paddr;
 	struct sk_buff *skb;
+	unsigned int rx_unclean = 0;
 
 	space = CIRC_SPACE(queue->rx_head, queue->rx_tail,
 			   pdata->rx_ring_size);
+	if (space < DEFAULT_RX_DESC_MIN_FREE)
+		return;
 
+	index = queue->rx_head & (pdata->rx_ring_size - 1);
 	while (space > 0) {
-		index = queue->rx_head & (pdata->rx_ring_size - 1);
-
 		if (!queue->rx_skb[index]) {
 			skb = netdev_alloc_skb(pdata->ndev, pdata->rx_buffer_len);
 			if (unlikely(!skb)) {
@@ -700,19 +702,19 @@ static void phytmac_rx_clean(struct phytmac_queue *queue)
 			queue->rx_skb[index] = skb;
 
 			hw_if->rx_map(queue, index, paddr);
-		} else {
-			hw_if->rx_map(queue, index, 0);
 		}
-
-		queue->rx_head++;
-		if (queue->rx_head >= pdata->rx_ring_size)
-			queue->rx_head &= (pdata->rx_ring_size - 1);
-
+		index = (index + 1) & (pdata->rx_ring_size - 1);
+		rx_unclean++;
 		space--;
 	}
 
 	/* make newly descriptor to hardware */
 	wmb();
+	hw_if->rx_clean(queue, rx_unclean);
+	/* make newly descriptor to hardware */
+	queue->rx_head += rx_unclean;
+	if (queue->rx_head >= pdata->rx_ring_size)
+		queue->rx_head &= (pdata->rx_ring_size - 1);
 }
 
 static int phytmac_rx(struct phytmac_queue *queue, struct napi_struct *napi,
@@ -726,16 +728,23 @@ static int phytmac_rx(struct phytmac_queue *queue, struct napi_struct *napi,
 
 	while (count < budget) {
 		desc = phytmac_get_rx_desc(queue, queue->rx_tail);
+		/* make newly desc to cpu */
+		rmb();
+
 		if (!hw_if->rx_complete(desc))
 			break;
+		/* Ensure ctrl is at least as up-to-date as rxused */
+		 dma_rmb();
 
 		if (hw_if->rx_single_buffer(desc))
 			skb = phytmac_rx_single(queue, desc);
 		else
 			skb = phytmac_rx_mbuffer(queue);
 
-		if (!skb)
+		if (!skb) {
+			netdev_warn(pdata->ndev, "phytmac rx skb is NULL\n");
 			break;
+		}
 
 		pdata->ndev->stats.rx_packets++;
 		queue->stats.rx_packets++;
@@ -797,10 +806,10 @@ static int phytmac_maybe_stop_tx_queue(struct phytmac_queue *queue,
 static int phytmac_maybe_wake_tx_queue(struct phytmac_queue *queue)
 {
 	struct phytmac *pdata = queue->pdata;
-	int space = CIRC_SPACE(queue->tx_tail, queue->tx_head,
+	int space = CIRC_CNT(queue->tx_tail, queue->tx_head,
 		       pdata->tx_ring_size);
 
-	return (space > DEFAULT_TX_DESC_MIN_FREE) ? 1 : 0;
+	return (space <= (3 * pdata->tx_ring_size / 4)) ? 1 : 0;
 }
 
 static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
@@ -810,7 +819,7 @@ static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	struct phytmac_tx_skb *tx_skb;
 	struct phytmac_dma_desc *desc;
-	int complate = 0;
+	int complete = 0;
 	int packet_count = 0;
 	unsigned int tail = queue->tx_tail;
 	unsigned int head;
@@ -818,20 +827,27 @@ static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
 	spin_lock(&pdata->lock);
 
 	for (head = queue->tx_head; head != tail && packet_count < budget; ) {
+		struct sk_buff *skb;
+
 		desc = phytmac_get_tx_desc(queue, head);
+		/* make newly desc to cpu */
+		rmb();
+
 		if (!hw_if->tx_complete(desc))
 			break;
 
 		  /* Process all buffers of the current transmitted frame */
 		for (;; head++) {
 			tx_skb = phytmac_get_tx_skb(queue, head);
-			if (tx_skb->skb) {
-				complate = 1;
+			skb = tx_skb->skb;
+			if (skb) {
+				complete = 1;
 				if (IS_REACHABLE(CONFIG_PHYTMAC_ENABLE_PTP)) {
-					if (unlikely(skb_shinfo(tx_skb->skb)->tx_flags &
+					if (unlikely(skb_shinfo(skb)->tx_flags &
 						     SKBTX_HW_TSTAMP) &&
-						     !phytmac_ptp_one_step(tx_skb->skb))
-						phytmac_ptp_txstamp(queue, tx_skb->skb, desc);
+						     !phytmac_ptp_one_step(skb)) {
+						phytmac_ptp_txstamp(queue, skb, desc);
+					}
 				}
 
 				if (netif_msg_drv(pdata))
@@ -848,8 +864,8 @@ static int phytmac_tx_clean(struct phytmac_queue *queue, int budget)
 			  /* Now we can safely release resources */
 			phytmac_tx_unmap(pdata, tx_skb, budget);
 
-			if (complate) {
-				complate = 0;
+			if (complete) {
+				complete = 0;
 				break;
 			}
 		}
@@ -885,6 +901,9 @@ static int phytmac_rx_poll(struct napi_struct *napi, int budget)
 		hw_if->enable_irq(pdata, queue->index, pdata->rx_irq_mask);
 
 		desc = phytmac_get_rx_desc(queue, queue->rx_tail);
+		/* make newly desc to cpu */
+		rmb();
+
 		if (hw_if->rx_complete(desc)) {
 			hw_if->disable_irq(pdata, queue->index, pdata->rx_irq_mask);
 			hw_if->clear_irq(pdata, queue->index, PHYTMAC_INT_RX_COMPLETE);
@@ -913,6 +932,8 @@ static int phytmac_tx_poll(struct napi_struct *napi, int budget)
 		hw_if->enable_irq(pdata, queue->index, PHYTMAC_INT_TX_COMPLETE);
 		if (queue->tx_head != queue->tx_tail) {
 			desc = phytmac_get_tx_desc(queue, queue->tx_head);
+			/* make newly desc to cpu */
+			rmb();
 
 			if (hw_if->tx_complete(desc)) {
 				hw_if->disable_irq(pdata, queue->index, PHYTMAC_INT_TX_COMPLETE);
@@ -1190,7 +1211,8 @@ static netdev_tx_t phytmac_start_xmit(struct sk_buff *skb, struct net_device *nd
 		return ret;
 	}
 
-	if (phytmac_packet_info(pdata, queue, skb, &packet)) {
+	ret = phytmac_packet_info(pdata, queue, skb, &packet);
+	if (ret) {
 		dev_kfree_skb_any(skb);
 		return ret;
 	}
@@ -1346,6 +1368,8 @@ static void phytmac_mac_link_down(struct phylink_config *config, unsigned int mo
 	struct phytmac_queue *queue;
 	unsigned int q;
 	unsigned long flags;
+	struct phytmac_tx_skb *tx_skb;
+	int i;
 
 	if (netif_msg_link(pdata)) {
 		netdev_info(ndev, "link down interface:%s, mode=%d\n",
@@ -1363,6 +1387,16 @@ static void phytmac_mac_link_down(struct phylink_config *config, unsigned int mo
 
 	/* Disable Rx and Tx */
 	hw_if->enable_network(pdata, false, PHYTMAC_RX | PHYTMAC_TX);
+
+	/* Tx clean */
+	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q, ++queue) {
+		for (i = 0; i < pdata->tx_ring_size; i++) {
+			tx_skb = phytmac_get_tx_skb(queue, i);
+			if (tx_skb)
+				phytmac_tx_unmap(pdata, tx_skb, 0);
+		}
+	}
+
 	spin_unlock_irqrestore(&pdata->lock, flags);
 
 	netif_tx_stop_all_queues(ndev);
@@ -1588,7 +1622,7 @@ static int phytmac_open(struct net_device *ndev)
 
 	ret = phytmac_get_mac_address(pdata);
 	if (ret) {
-		netdev_err(ndev, "phytmac get mad address failed\n");
+		netdev_err(ndev, "phytmac get mac address failed\n");
 		goto reset_hw;
 	}
 
