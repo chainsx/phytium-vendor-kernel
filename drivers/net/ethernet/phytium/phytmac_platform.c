@@ -160,7 +160,7 @@ static int phytmac_plat_probe(struct platform_device *pdev)
 
 	pdata->wol = 0;
 	if (device_property_read_bool(&pdev->dev, "magic-packet"))
-		pdata->wol |= WAKE_MAGIC;
+		pdata->wol |= PHYTMAC_WAKE_MAGIC;
 
 	pdata->use_ncsi = device_property_read_bool(&pdev->dev, "use-ncsi");
 	pdata->use_mii = device_property_read_bool(&pdev->dev, "use-mii");

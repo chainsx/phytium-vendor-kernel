@@ -1667,20 +1667,6 @@ static int phytmac_open(struct net_device *ndev)
 		goto reset_hw;
 	}
 
-	if (pdata->use_mii && !pdata->mii_bus) {
-		ret = phytmac_mdio_register(pdata);
-		if (ret) {
-			netdev_err(ndev, "MDIO bus registration failed\n");
-			goto err_mdio_register;
-		}
-	}
-
-	ret = phytmac_phylink_create(pdata);
-	if (ret) {
-		netdev_err(ndev, "phytmac phylink create failed(error %d)\n", ret);
-		goto err_mdio_register;
-	}
-
 	ret = netif_set_real_num_tx_queues(ndev, pdata->queues_num);
 	if (ret) {
 		netdev_err(ndev, "error setting real tx queue number\n");
@@ -1697,7 +1683,7 @@ static int phytmac_open(struct net_device *ndev)
 	if (ret) {
 		netdev_err(ndev, "Unable to allocate DMA memory (error %d)\n",
 			   ret);
-		goto err_mdio_register;
+		goto reset_hw;
 	}
 
 	for (queue = pdata->queues; q < pdata->queues_num; ++q) {
@@ -1713,7 +1699,7 @@ static int phytmac_open(struct net_device *ndev)
 	if (ret) {
 		netdev_err(ndev, "phylink connet failed,(error %d)\n",
 			   ret);
-		goto err_mdio_register;
+		goto reset_hw;
 	}
 
 	phylink_start(pdata->phylink);
@@ -1725,7 +1711,7 @@ static int phytmac_open(struct net_device *ndev)
 		if (ret) {
 			netdev_err(ndev, "ptp register failed, (error %d)\n",
 				   ret);
-			goto err_mdio_register;
+			goto reset_hw;
 		}
 
 		phytmac_ptp_init(pdata->ndev);
@@ -1733,9 +1719,6 @@ static int phytmac_open(struct net_device *ndev)
 
 	return 0;
 
-err_mdio_register:
-	if (pdata->mii_bus)
-		mdiobus_unregister(pdata->mii_bus);
 reset_hw:
 	hw_if->reset_hw(pdata);
 	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q) {
@@ -1969,6 +1952,8 @@ static int phytmac_init(struct phytmac *pdata)
 		spin_lock_init(&pdata->rx_fs_lock);
 	}
 
+	device_set_wakeup_enable(pdata->dev, pdata->wol ? 1 : 0);
+
 	return 0;
 }
 
@@ -2057,7 +2042,25 @@ int phytmac_drv_probe(struct phytmac *pdata)
 		dev_dbg(pdata->dev, "probe success!Phytium %s at 0x%08lx irq %d (%pM)\n",
 			"MAC", ndev->base_addr, ndev->irq, ndev->dev_addr);
 
+	if (pdata->use_mii && !pdata->mii_bus) {
+		ret = phytmac_mdio_register(pdata);
+		if (ret) {
+			netdev_err(ndev, "MDIO bus registration failed\n");
+			goto err_phylink_init;
+		}
+	}
+
+	ret = phytmac_phylink_create(pdata);
+	if (ret) {
+		netdev_err(ndev, "phytmac phylink create failed, error %d\n", ret);
+		goto err_phylink_init;
+	}
+
 	return 0;
+
+err_phylink_init:
+	if (pdata->mii_bus)
+		mdiobus_unregister(pdata->mii_bus);
 
 err_out_free_netdev:
 	free_netdev(ndev);
