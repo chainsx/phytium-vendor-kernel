@@ -416,7 +416,7 @@ static int32_t phytium_dma_channelRelease(struct DMA_CONTROLLER *priv, struct DM
 		}
 	}
 
-	channel->status = DMA_STATUS_UNKNOW;
+	channel->status = DMA_STATUS_UNKNOWN;
 
 	return 0;
 }
@@ -646,7 +646,7 @@ static enum DMA_Status phytium_dma_getChannelStatus(struct DMA_CONTROLLER *priv,
 	uint32_t ep_cmd, ep_sts;
 
 	if (!priv || !channel)
-		return DMA_STATUS_UNKNOW;
+		return DMA_STATUS_UNKNOWN;
 
 	if (channel->status >= DMA_STATUS_BUSY) {
 		phytium_write32(&priv->regs->ep_sel, channel->isDirTx | channel->hwUsbEppNum);
@@ -692,7 +692,7 @@ static int32_t phytium_dma_channelAbort(struct DMA_CONTROLLER *priv, struct DMA_
 			}
 		}
 	}
-	if (channel->status != DMA_STATUS_UNKNOW)
+	if (channel->status != DMA_STATUS_UNKNOWN)
 		channel->status = DMA_STATUS_FREE;
 
 	return 0;

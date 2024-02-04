@@ -417,7 +417,8 @@ config GPIO_PHYTIUM_PLAT
 	select GENERIC_IRQ_CHIP
 	select GPIOLIB_IRQCHIP
 	help
-	  Say yes here to enable GPIO support for Phytium SoCs.
+	  Say yes here to support the on-chip GPIO controller for the
+	  Phytium SoC family.
 
 config GPIO_PHYTIUM_SGPIO
 	tristate "Phytium SGPIO support"

@@ -345,6 +345,7 @@ struct phytium_nfc {
 	struct device *dev;
 	void __iomem *regs;
 	int irq;
+	struct completion complete;
 	struct list_head chips;
 	struct nand_chip *selected_chip;
 	struct phytium_nfc_caps *caps;
@@ -361,6 +362,7 @@ struct phytium_nfc {
 	u32 timing_mode;
 
 	spinlock_t spinlock;
+	struct work_struct work;
 };
 
 /**

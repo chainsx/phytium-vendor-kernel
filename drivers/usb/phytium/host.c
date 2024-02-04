@@ -11,7 +11,7 @@
 
 #define DRV_NAME "phytium_usb"
 
-#define HOST_GENERIC_EP_CONTROLL 0x00
+#define HOST_GENERIC_EP_CONTROL 0x00
 #define HOST_GENERIC_EP_ISOC 0x01
 #define HOST_GENERIC_EP_BULK 0x02
 #define HOST_GENERIC_EP_INT 0x03
@@ -724,7 +724,7 @@ static void hostStartReq(struct HOST_CTRL *priv, struct HOST_REQ *req)
 			case USB_ENDPOINT_XFER_CONTROL:
 				usbReq = getNextReq(hostEp);
 
-				priv->in[HOST_GENERIC_EP_CONTROLL].scheduledUsbHEp = hostEp;
+				priv->in[HOST_GENERIC_EP_CONTROL].scheduledUsbHEp = hostEp;
 				priv->ep0State = HOST_EP0_STAGE_SETUP;
 				hostEpPriv->currentHwEp = hostEpPriv->genericHwEp;
 				hostEpPriv->genericHwEp->scheduledUsbHEp = hostEp;
@@ -778,6 +778,38 @@ static void hostStartReq(struct HOST_CTRL *priv, struct HOST_REQ *req)
 	}
 }
 
+static void abortTransfer(struct HOST_CTRL *priv,
+		struct HOST_REQ *usbReq, struct HostEp *hwEp)
+{
+	struct HOST_EP *usbEp;
+	struct HOST_EP_PRIV *usbHEpPriv;
+	uint32_t status;
+
+	if (!priv || !usbReq || !hwEp || !hwEp->scheduledUsbHEp)
+		return;
+
+	usbEp = hwEp->scheduledUsbHEp;
+	usbHEpPriv = (struct HOST_EP_PRIV *)usbEp->hcPriv;
+	if (!usbHEpPriv)
+		return;
+
+	status = (usbReq->status == EINPROGRESS) ? 0 : usbReq->status;
+	givebackRequest(priv, usbReq, status);
+
+	if (list_empty(&usbEp->reqList)) {
+		usbHEpPriv->epIsReady = 0;
+		usbHEpPriv->currentHwEp = NULL;
+		hwEp->scheduledUsbHEp = NULL;
+
+		if (hwEp->channel) {
+			priv->dmaDrv->dma_channelRelease(priv->dmaController, hwEp->channel);
+			hwEp->channel = NULL;
+		}
+
+		if (usb_endpoint_xfer_int(&usbEp->desc))
+			list_del(&usbHEpPriv->node);
+	}
+}
 
 static void scheduleNextTransfer(struct HOST_CTRL *priv,
 		struct HOST_REQ *usbReq, struct HostEp *hwEp)
@@ -877,7 +909,7 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 	if (!priv)
 		return -EINVAL;
 
-	hwEp = isIn ? &priv->in[HOST_GENERIC_EP_CONTROLL] : &priv->out[HOST_GENERIC_EP_CONTROLL];
+	hwEp = isIn ? &priv->in[HOST_GENERIC_EP_CONTROL] : &priv->out[HOST_GENERIC_EP_CONTROL];
 	hostEp = hwEp->scheduledUsbHEp;
 	usbHEpPriv = (struct HOST_EP_PRIV *)hostEp->hcPriv;
 
@@ -913,13 +945,13 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 		switch (priv->ep0State) {
 		case HOST_EP0_STAGE_IN:
 			pr_debug("Ep0 Data IN\n");
-			usbHEpPriv->currentHwEp = &priv->out[HOST_GENERIC_EP_CONTROLL];
+			usbHEpPriv->currentHwEp = &priv->out[HOST_GENERIC_EP_CONTROL];
 			usbReq->actualLength = length;
 			priv->ep0State = HOST_EP0_STAGE_STATUSOUT;
 			break;
 		case HOST_EP0_STAGE_OUT:
 			pr_debug("Ep0 Data OUT\n");
-			usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+			usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 			usbReq->actualLength = length;
 			priv->ep0State = HOST_EP0_STAGE_STATUSIN;
 			break;
@@ -928,12 +960,12 @@ static int32_t hostEp0Irq(struct HOST_CTRL *priv, uint8_t isIn)
 			if (!usbReq->setup->wLength) {
 				pr_debug("EP0_STAGE_STATUSIN\n");
 				priv->ep0State = HOST_EP0_STAGE_STATUSIN;
-				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 				break;
 			} else if (usbReq->setup->bRequestType & USB_DIR_IN) {
 				pr_debug("EP0_STAGE_STAGE_IN\n");
 				priv->ep0State = HOST_EP0_STAGE_IN;
-				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROLL];
+				usbHEpPriv->currentHwEp = &priv->in[HOST_GENERIC_EP_CONTROL];
 				nextStage = 1;
 				break;
 			}
@@ -1917,11 +1949,58 @@ int32_t hostEpDisable(struct HOST_CTRL *priv, struct HOST_EP *ep)
 	return 0;
 }
 
+unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc, int speed)
+{
+	unsigned int interval = 0;
+
+	switch (speed) {
+	case USB_SPEED_HIGH:
+		if (usb_endpoint_xfer_control(&desc) || usb_endpoint_xfer_bulk(&desc)) {
+			if (desc.bInterval == 0)
+				return interval;
+			interval = fls(desc.bInterval) - 1;
+			interval = clamp_val(interval, 0, 15);
+			interval = 1 << interval;
+			if (interval != desc.bInterval)
+				pr_debug("rounding to %d microframes, desc %d microframes\n",
+					interval, desc.bInterval);
+			break;
+		}
+
+		if (usb_endpoint_xfer_isoc(&desc) || usb_endpoint_xfer_int(&desc)) {
+			interval = clamp_val(desc.bInterval, 1, 16) - 1;
+			interval = 1 << interval;
+			if (interval != desc.bInterval - 1)
+				pr_debug("rounding to %d %sframes\n", interval,
+					speed == USB_SPEED_FULL ? "" : "micro");
+		}
+		break;
+	case USB_SPEED_FULL:
+		if (usb_endpoint_xfer_isoc(&desc)) {
+			interval = clamp_val(desc.bInterval, 1, 16);
+			if (interval != desc.bInterval)
+				pr_debug("rounding to %d %sframes\n", 1 << interval,
+					speed == USB_SPEED_FULL ? "" : "micro");
+			break;
+		}
+	/* fall through */
+	case USB_SPEED_LOW:
+		if (usb_endpoint_xfer_int(&desc) || usb_endpoint_xfer_isoc(&desc)) {
+			interval = fls(desc.bInterval * 8) - 1;
+			interval = clamp_val(interval, 3, 10);
+			if ((1 << interval) != desc.bInterval * 8)
+				pr_debug("rounding to %d microframes, desc %d microframes\n",
+					1 << interval, desc.bInterval);
+		}
+	}
+
+	return interval;
+}
+
 int32_t hostReqQueue(struct HOST_CTRL *priv, struct HOST_REQ *req)
 {
 	struct HOST_EP_PRIV *hostEpPriv;
 	struct list_head *hEpQueue = NULL;
-	uint32_t interval = 0;
 	uint8_t idleQueue = 0;
 
 	if (!priv || !req)
@@ -1946,6 +2025,8 @@ int32_t hostReqQueue(struct HOST_CTRL *priv, struct HOST_REQ *req)
 	hostEpPriv->usbHEp = req->usbEp;
 	hostEpPriv->isIn = req->epIsIn;
 
+	hostEpPriv->frame = get_endpoint_interval(req->usbEp->desc, req->usbDev->speed);
+	hostEpPriv->interval = hostEpPriv->frame;
 	switch (usb_endpoint_type(&req->usbEp->desc)) {
 	case USB_ENDPOINT_XFER_CONTROL:
 		hostEpPriv->isIn = 0;
@@ -1958,41 +2039,14 @@ int32_t hostReqQueue(struct HOST_CTRL *priv, struct HOST_REQ *req)
 		hostEpPriv->type = USB_ENDPOINT_XFER_BULK;
 		break;
 	case USB_ENDPOINT_XFER_INT:
-		if (req->usbDev->speed < USB_SPEED_FULL)
-			interval = (req->usbEp->desc.bInterval < 10) ? 10 : req->usbEp->desc.bInterval;
-		else if (req->usbDev->speed == USB_SPEED_FULL)
-			interval = (req->usbEp->desc.bInterval < 1) ?
-				1 : req->usbEp->desc.bInterval;
-		else {
-			if (req->usbEp->desc.bInterval < 1)
-				interval = 1;
-			else if (req->usbEp->desc.bInterval > 16)
-				interval = 16;
-			else
-				interval = req->usbEp->desc.bInterval;
-
-			interval = 1 << (interval - 1);
-		}
 		hEpQueue = hostEpPriv->isIn ? &priv->intInHEpQueue[req->epNum - 1] :
 			&priv->intOutHEpQueue[req->epNum - 1];
 		hostEpPriv->type = USB_ENDPOINT_XFER_INT;
-		hostEpPriv->frame = interval;
-		hostEpPriv->interval = interval;
 		break;
 	case USB_ENDPOINT_XFER_ISOC:
-		if (req->usbEp->desc.bInterval < 1)
-			interval = 1;
-		else if (req->usbEp->desc.bInterval > 16)
-			interval = 16;
-		else
-			interval = req->usbEp->desc.bInterval;
-
-		interval = 1 << (interval - 1);
 		hEpQueue = hostEpPriv->isIn ? &priv->isoInHEpQueue[req->epNum - 1] :
 			&priv->isoOutHEpQueue[req->epNum - 1];
 		hostEpPriv->type = USB_ENDPOINT_XFER_ISOC;
-		hostEpPriv->frame = interval;
-		hostEpPriv->interval = interval;
 		break;
 	default:
 		break;
@@ -2029,8 +2083,6 @@ static int abortActuallyUsbRequest(struct HOST_CTRL *priv,
 {
 	struct HOST_EP_PRIV *usbEpPriv;
 	struct HostEp *hostEp;
-	uint16_t rxerrien = 0;
-	uint16_t txerrien = 0;
 	uint8_t rxcon, txcon;
 
 	if (!priv || !req || !usbEp)
@@ -2040,31 +2092,20 @@ static int abortActuallyUsbRequest(struct HOST_CTRL *priv,
 	hostEp = usbEpPriv->currentHwEp;
 
 	usbEpPriv->transferFinished = 1;
-
 	if (hostEp->isInEp) {
 		if (hostEp->hwEpNum) {
 			rxcon = phytium_read8(&priv->regs->ep[hostEp->hwEpNum - 1].rxcon);
 			rxcon = rxcon & (~BIT(7));
 			phytium_write8(&priv->regs->ep[hostEp->hwEpNum - 1].rxcon, rxcon);
 		}
-		rxerrien = phytium_read16(&priv->regs->rxerrien);
-		rxerrien &= ~(1 << hostEp->hwEpNum);
-		phytium_write16(&priv->regs->rxerrien, rxerrien);
-		phytium_write8(&priv->regs->endprst, ENDPRST_FIFORST |
-				ENDPRST_IO_TX | hostEp->hwEpNum);
 	} else {
 		if (hostEp->hwEpNum) {
 			txcon = phytium_read8(&priv->regs->ep[hostEp->hwEpNum - 1].txcon);
 			txcon = txcon & (~BIT(7));
 			phytium_write8(&priv->regs->ep[hostEp->hwEpNum - 1].txcon, txcon);
 		}
-		txerrien = phytium_read16(&priv->regs->txerrien);
-		txerrien &= ~(1 << hostEp->hwEpNum);
-		phytium_write16(&priv->regs->txerrien, txerrien);
-		phytium_write8(&priv->regs->endprst, ENDPRST_FIFORST | hostEp->hwEpNum);
 	}
-
-	scheduleNextTransfer(priv, req, hostEp);
+	abortTransfer(priv, req, hostEp);
 
 	return 0;
 }

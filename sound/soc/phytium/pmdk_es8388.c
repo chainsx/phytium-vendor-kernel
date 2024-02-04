@@ -82,8 +82,8 @@ static int pmdk_es8388_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Jack detection API stuff */
 	ret = snd_soc_card_jack_new(rtd->card, "Headset Jack", SND_JACK_HEADSET,
-				    &hs_jack, hs_jack_pins,
-				    ARRAY_SIZE(hs_jack_pins));
+			    &hs_jack, hs_jack_pins,
+			    ARRAY_SIZE(hs_jack_pins));
 	if (ret)
 		goto err;
 
@@ -138,7 +138,7 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 	hs_jack_gpios[0].gpiod_dev = dev;
 	n = gpiod_count(dev, "det");
 
-	if(n < 0)
+	if (n < 0)
 		pmdk_dai[0].init = NULL;
 
 	return devm_snd_soc_register_card(&pdev->dev, card);

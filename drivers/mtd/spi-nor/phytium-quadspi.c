@@ -118,7 +118,7 @@
 #define QSPI_WIP_W_CMD_MASK		(0xFF << QSPI_WIP_W_CMD_SHIFT)
 #define QSPI_WIP_W_TRANSFER_SHIFT	3
 #define QSPI_WIP_W_TRANSFER_MASK	(0x3 << QSPI_WIP_W_TRANSFER_SHIFT)
-#define QSPI_WIP_W_SCK_SEL_SHIFT      	0
+#define QSPI_WIP_W_SCK_SEL_SHIFT	0
 #define QSPI_WIP_W_SCK_SEL_MASK		(0x7 << QSPI_WIP_W_SCK_SEL_SHIFT)
 
 #define QSPI_WP_EN_SHIFT		17
@@ -160,7 +160,7 @@
 #define CMD_RDAR	  0x65
 #define CMD_P4E           0x20
 #define CMD_4P4E          0x21
-#define CMD_BE      	  0x60
+#define CMD_BE		  0x60
 #define CMD_4BE           0xC7
 #define	CMD_READ          0x03
 #define	CMD_FAST_READ     0x0B
@@ -232,7 +232,7 @@ static int memcpy_from_ftreg(struct phytium_qspi *qspi, u_char *buf, size_t len)
 		return -EINVAL;
 
 	for (i = 0; i < len; i++) {
-		if (0 == i % 4)
+		if (i % 4 == 0)
 			val = readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
 
 		buf[i] = (u_char) (val >> (i % 4) * 8) & 0xFF;
@@ -249,16 +249,16 @@ static int memcpy_to_ftreg(struct phytium_qspi *qspi, u_char *buf, size_t len)
 	if (!qspi || !buf || (len >= 8))
 		return -EINVAL;
 
-	if (1 == len) {
+	if (len == 1) {
 		val = buf[0];
-	} else if (2 == len) {
+	} else if (len == 2) {
 		val = buf[1];
 		val = (val << 8) + buf[0];
-	} else if (3 == len) {
+	} else if (len == 3) {
 		val = buf[2];
 		val = (val << 8) + buf[1];
 		val = (val << 8) + buf[0];
-	} else if (4 == len) {
+	} else if (len == 4) {
 		val = buf[3];
 		val = (val << 8) + buf[2];
 		val = (val << 8) + buf[1];
@@ -455,7 +455,7 @@ static int phytium_qspi_write_reg(struct spi_nor *nor, u8 opcode,
 	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%pK len:%#x\n",
 		opcode, buf, len);
 
-	switch(opcode){
+	switch (opcode) {
 	case CMD_WREN:
 		phytium_qspi_write_enable(qspi, flash);
 		return 0;
@@ -470,11 +470,10 @@ static int phytium_qspi_write_reg(struct spi_nor *nor, u8 opcode,
 	cmd |= PHYTIUM_CMD_SCK_SEL << QSPI_CMD_PORT_SCK_SEL_SHIFT;
 	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
 
-	if ((len > 8) || (NULL == buf)) {
-		dev_err(dev, "data length exceed. commad %x, len:%d \n", opcode, len);
+	if (len > 8 || !buf) {
+		dev_err(dev, "data length exceed. commad %x, len:%d\n", opcode, len);
 		return -EINVAL;
-	}
-	else if(len > 0){
+	}  else if (len > 0) {
 		cmd |= ((len - 1) << QSPI_CMD_PORT_RW_NUM_SHIFT) & QSPI_CMD_PORT_RW_NUM_MASK;
 		cmd |= BIT(QSPI_CMD_PORT_DATA_TRANSFER_SHIFT);
 	}
@@ -574,12 +573,11 @@ static ssize_t phytium_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 	case 0x5A:
 		cmd &= ~QSPI_RD_CFG_RD_ADDR_SEL_MASK;
 		return phytium_qspi_read_flash_sfdp(qspi, flash, nor, from, buf, len);
-		break;
 	default:
 		break;
 	}
 
-	if(nor->read_dummy != 0) {
+	if (nor->read_dummy != 0) {
 		cmd |= BIT(QSPI_RD_CFG_RD_LATENCY_SHIFT);
 
 		cmd &= ~QSPI_RD_CFG_DUMMY_MASK;
@@ -640,9 +638,8 @@ static ssize_t phytium_qspi_write(struct spi_nor *nor, loff_t to, size_t len,
 	dev_dbg(qspi->dev, "write cmd:%x\n", cmd);
 	writel_relaxed(cmd, qspi->io_base + QSPI_WR_CFG_REG);
 
-	for (i = 0; i < len/4; i++) {
+	for (i = 0; i < len/4; i++)
 		writel_relaxed(*(u32 *)(buf + 4*i), qspi->mm_base + addr + 4*i);
-	}
 
 	if (len & mask) {
 		addr =  addr + (len & ~mask);
@@ -872,7 +869,7 @@ static int phytium_qspi_flash_setup(struct phytium_qspi *qspi,
 
 	flash->registered = true;
 
-	dev_dbg(qspi->dev, "read mm:%s %px cs:%d bus:%d clk-div:%d\n",
+	dev_dbg(qspi->dev, "read mm:%s %p cs:%d bus:%d clk-div:%d\n",
 		flash->read_mode == PHYTIUM_FMODE_MM ? "yes" : "no",
 		qspi->mm_base, cs_num, width, clk_div);
 
@@ -910,7 +907,7 @@ static ssize_t clk_div_store(struct device *dev,
 	char *token;
 	ssize_t status;
 
-	token = strsep ((char **)&buf, " ");
+	token = strsep((char **)&buf, " ");
 	if (!token)
 		return -EINVAL;
 
@@ -1042,7 +1039,7 @@ MODULE_DEVICE_TABLE(acpi, phytium_qspi_acpi_ids);
 #endif
 
 static const struct of_device_id phytium_qspi_match[] = {
-	{.compatible = "phytium,qspi"},
+	{ .compatible = "phytium,qspi" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, phytium_qspi_match);
