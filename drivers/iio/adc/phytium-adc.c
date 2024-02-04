@@ -579,7 +579,6 @@ static int phytium_adc_probe(struct platform_device *pdev)
 	indio_dev = devm_iio_device_alloc(dev, sizeof(*adc));
 	if (!indio_dev)
 		return -ENOMEM;
-	platform_set_drvdata(pdev, indio_dev);
 
 	adc = iio_priv(indio_dev);
 	adc->dev = dev;
@@ -607,6 +606,8 @@ static int phytium_adc_probe(struct platform_device *pdev)
 	indio_dev->channels = adc->data->channels;
 	indio_dev->num_channels = adc->data->num_channels;
 
+	platform_set_drvdata(pdev, indio_dev);
+
 	ret = devm_request_threaded_irq(adc->dev, platform_get_irq(pdev, 0),
 					NULL, phytium_adc_threaded_irq, IRQF_ONESHOT,
 					dev_name(dev), adc);
@@ -626,7 +627,7 @@ static int phytium_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	return devm_iio_device_register(dev, indio_dev);
+	return iio_device_register(indio_dev);
 }
 
 static int phytium_adc_remove(struct platform_device *pdev)

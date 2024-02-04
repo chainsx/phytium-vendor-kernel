@@ -470,4 +470,4 @@ module_platform_driver(phytium_pcie_ep_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Yang Xun <yangxun@phytium.com.cn>");
-MODULE_DESCRIPTION("Phytium Pcie Controller Endpoint driver");
+MODULE_DESCRIPTION("Phytium PCIe Controller Endpoint driver");

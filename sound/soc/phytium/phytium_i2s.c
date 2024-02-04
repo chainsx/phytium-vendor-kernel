@@ -1027,11 +1027,11 @@ static int phytium_configure_dai_by_dt(struct i2s_phytium *dev)
 
 	if (COMP1_TX_ENABLED(comp1)) {
 		idx2 = COMP1_TX_WORDSIZE_0(comp1);
-		dev->capability |= DWC_I2S_PLAY;
+		dev->capability |= PHYTIUM_I2S_PLAY;
 	}
 	if (COMP1_RX_ENABLED(comp1)) {
 		idx2 = COMP2_RX_WORDSIZE_0(comp2);
-		dev->capability |= DWC_I2S_RECORD;
+		dev->capability |= PHYTIUM_I2S_RECORD;
 	}
 
 	return 0;

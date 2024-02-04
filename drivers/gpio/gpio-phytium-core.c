@@ -148,7 +148,7 @@ void phytium_gpio_irq_ack(struct irq_data *d)
 
 	raw_spin_lock(&gpio->lock);
 
-	writel(val, gpio->regs + GPIO_PORTA_EOI);
+	writel(val | 0xffffffff, gpio->regs + GPIO_PORTA_EOI);
 
 	raw_spin_unlock(&gpio->lock);
 }

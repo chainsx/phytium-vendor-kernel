@@ -13,9 +13,7 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/types.h>
-#include <sound/dmaengine_pcm.h>
 #include <sound/pcm.h>
-#include <sound/designware_i2s.h>
 
 /* I2S clk setting*/
 #define CLK_CFG0	0xc00
@@ -132,6 +130,12 @@
 
 
 #define azx_stream(dev)		(&(dev)->core)
+
+struct i2s_clk_config_data {
+	int chan_nr;
+	u32 data_width;
+	u32 sample_rate;
+};
 
 struct i2sc_bus {
 	struct device *dev;

@@ -66,9 +66,10 @@ phytium_fb_alloc(struct drm_device *dev, const struct drm_mode_fb_cmd2 *mode_cmd
 		return ERR_PTR(ret);
 	}
 
-	for (i = 0; i < num_planes; i++)
+	for (i = 0; i < num_planes; i++) {
 		phytium_fb->phytium_gem_obj[i] = phytium_gem_obj[i];
-
+		phytium_fb->base.obj[i] = &phytium_gem_obj[i]->base;
+	}
 	return phytium_fb;
 }
 
