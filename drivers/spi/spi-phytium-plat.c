@@ -29,8 +29,14 @@
 
 #define DRIVER_NAME "phytium_spi"
 
+struct phytium_spi_clk {
+	struct phytium_spi  fts;
+	struct clk     *clk;
+};
+
 static int phytium_spi_probe(struct platform_device *pdev)
 {
+	struct phytium_spi_clk *ftsc;
 	struct phytium_spi *fts;
 	struct resource *mem;
 	int ret;
@@ -39,10 +45,12 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	int global_cs;
 	int i;
 
-	fts = devm_kzalloc(&pdev->dev, sizeof(struct phytium_spi),
+	ftsc = devm_kzalloc(&pdev->dev, sizeof(struct phytium_spi_clk),
 			GFP_KERNEL);
-	if (!fts)
+	if (!ftsc)
 		return -ENOMEM;
+
+	fts = &ftsc->fts;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -64,15 +72,15 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	}
 
 	if (pdev->dev.of_node) {
-		fts->clk = devm_clk_get(&pdev->dev, NULL);
+		ftsc->clk = devm_clk_get(&pdev->dev, NULL);
 
-		if (IS_ERR(fts->clk))
-			return PTR_ERR(fts->clk);
-		ret = clk_prepare_enable(fts->clk);
+		if (IS_ERR(ftsc->clk))
+			return PTR_ERR(ftsc->clk);
+		ret = clk_prepare_enable(ftsc->clk);
 		if (ret)
 			return ret;
 
-		fts->max_freq = clk_get_rate(fts->clk);
+		fts->max_freq = clk_get_rate(ftsc->clk);
 	} else if (has_acpi_companion(&pdev->dev)) {
 		fts->max_freq = 48000000;
 	}
@@ -103,7 +111,7 @@ static int phytium_spi_probe(struct platform_device *pdev)
 					goto out;
 			}
 		}
-	} else if(has_acpi_companion(&pdev->dev)) {
+	} else if (has_acpi_companion(&pdev->dev)) {
 		int n;
 		int *cs;
 		struct gpio_desc *gpiod;
@@ -142,20 +150,20 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	if (ret)
 		goto out;
 
-	platform_set_drvdata(pdev, fts);
+	platform_set_drvdata(pdev, ftsc);
 	return 0;
 
 out:
-	clk_disable_unprepare(fts->clk);
+	clk_disable_unprepare(ftsc->clk);
 	return ret;
 }
 
 static int phytium_spi_remove(struct platform_device *pdev)
 {
-	struct phytium_spi *fts = platform_get_drvdata(pdev);
+	struct phytium_spi_clk *ftsc = platform_get_drvdata(pdev);
 
-	phytium_spi_remove_host(fts);
-	clk_disable_unprepare(fts->clk);
+	phytium_spi_remove_host(&ftsc->fts);
+	clk_disable_unprepare(ftsc->clk);
 
 	return 0;
 }
@@ -163,16 +171,16 @@ static int phytium_spi_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM_SLEEP
 static int spi_suspend(struct device *dev)
 {
-	struct phytium_spi *fts = dev_get_drvdata(dev);
+	struct phytium_spi_clk *ftsc = dev_get_drvdata(dev);
 
-	return phytium_spi_suspend_host(fts);
+	return phytium_spi_suspend_host(&ftsc->fts);
 }
 
 static int spi_resume(struct device *dev)
 {
-	struct phytium_spi *fts = dev_get_drvdata(dev);
+	struct phytium_spi_clk *ftsc = dev_get_drvdata(dev);
 
-	return phytium_spi_resume_host(fts);
+	return phytium_spi_resume_host(&ftsc->fts);
 }
 #endif
 

@@ -54,8 +54,6 @@ static u32 nfc_irq_st;
 static u32 nfc_irq_en;
 static u32 nfc_irq_complete;
 
-static DECLARE_WAIT_QUEUE_HEAD(wait_done);
-
 /*
  * Internal helper to conditionnally apply a delay (from the above structure,
  * most of the time).
@@ -331,6 +329,8 @@ int phytium_nfc_send_cmd(struct nand_chip *chip,
 		return 0;
 	}
 
+	reinit_completion(&nfc->complete);
+
 	spin_lock(&nfc->spinlock);
 	value = nfc->dsp_phy_addr & 0xFFFFFFFF;
 	phytium_write(nfc, NDAR0, value);
@@ -393,6 +393,8 @@ int phytium_nfc_send_cmd2(struct nand_chip *chip,
 		return 0;
 	}
 
+	reinit_completion(&nfc->complete);
+
 	spin_lock(&nfc->spinlock);
 	value = nfc->dsp_phy_addr & 0xFFFFFFFF;
 	phytium_write(nfc, NDAR0, value);
@@ -426,9 +428,8 @@ int phytium_nfc_wait_op(struct nand_chip *chip,
 	else if (timeout_ms < 100)
 		timeout_ms = 100;
 
-	ret = wait_event_interruptible_timeout(wait_done, nfc_irq_complete,
+	ret = wait_for_completion_timeout(&nfc->complete,
 					  msecs_to_jiffies(timeout_ms));
-	nfc_irq_complete = false;
 
 	if (!ret) {
 		dev_err(nfc->dev, "Timeout waiting for RB signal\n");
@@ -437,6 +438,7 @@ int phytium_nfc_wait_op(struct nand_chip *chip,
 			phytium_read(nfc, NDIR), phytium_read(nfc, NDIR_MASK));
 		dev_err(nfc->dev, "NFC debug: %x\n", phytium_read(nfc, ND_DEBUG));
 
+		complete_release(&nfc->complete);
 		phytium_nfc_clear_int(nfc, NDIR_ALL_INT(nfc->caps->int_mask_bits));
 		return -ETIMEDOUT;
 	}
@@ -993,6 +995,21 @@ static void phytium_nfc_disable_hw_ecc(struct nand_chip *chip)
 		phytium_write(nfc, NDCR0, ndcr0 & ~NDCR0_ECC_EN);
 }
 
+static void nfc_irq_callback(struct work_struct *work)
+{
+	struct phytium_nfc *nfc = container_of(work, struct phytium_nfc, work);
+
+	if (!nfc)
+		return;
+
+	if (nfc_irq_complete)
+		complete_all(&nfc->complete);
+
+	nfc_irq_st = 0;
+	nfc_irq_en = 0;
+	nfc_irq_complete = 0;
+}
+
 irqreturn_t phytium_nfc_isr(int irq, void *dev_id)
 {
 	struct phytium_nfc *nfc = dev_id;
@@ -1030,7 +1047,7 @@ irqreturn_t phytium_nfc_isr(int irq, void *dev_id)
 		nfc_irq_complete = 1;
 	}
 
-	wake_up(&wait_done);
+	schedule_work(&nfc->work);
 
 	return IRQ_HANDLED;
 }
@@ -1490,10 +1507,8 @@ static int phytium_nand_page_write_hwecc(struct mtd_info *mtd, struct nand_chip 
 	ecc_offset = phytium_nand->ecc.offset;
 
 	nfc_op = kzalloc(2 * sizeof(struct phytium_nfc_op), GFP_KERNEL);
-	if (!nfc_op) {
-		dev_err(nfc->dev, "Can't malloc space for phytium_nfc_op\n");
+	if (!nfc_op)
 		return 0;
-	}
 
 	nfc_op->cle_ale_delay_ns = PSEC_TO_NSEC(sdr->tWB_max);
 	nfc_op->rdy_timeout_ms = PSEC_TO_MSEC(sdr->tR_max);
@@ -2104,10 +2119,14 @@ int phytium_nand_init(struct phytium_nfc *nfc)
 	nfc->controller.ops = &phytium_nand_controller_ops;
 	INIT_LIST_HEAD(&nfc->chips);
 
+	init_completion(&nfc->complete);
+
 	/* Init the controller and then probe the chips */
 	ret = phytium_nfc_init(nfc);
 	if (ret)
 		goto out;
+
+	INIT_WORK(&nfc->work, nfc_irq_callback);
 
 	ret = phytium_nand_chip_init(nfc);
 	if (ret)

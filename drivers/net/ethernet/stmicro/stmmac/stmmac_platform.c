@@ -618,13 +618,11 @@ EXPORT_SYMBOL_GPL(stmmac_probe_config_dt);
 EXPORT_SYMBOL_GPL(stmmac_remove_config_dt);
 
 #ifdef CONFIG_ACPI
-/*
- * Parse ACPI _DSD to setup AXI register
- */
-static struct stmmac_axi * stmmac_axi_setup_acpi(struct platform_device *pdev)
+/* Parse ACPI _DSD to setup AXI register */
+static struct stmmac_axi *stmmac_axi_setup_acpi(struct platform_device *pdev)
 {
-	struct fwnode_handle *np = dev_fwnode(&(pdev->dev));
-	struct stmmac_axi * axi;
+	struct fwnode_handle *np = dev_fwnode(&pdev->dev);
+	struct stmmac_axi *axi;
 
 	axi = devm_kzalloc(&pdev->dev, sizeof(*axi), GFP_KERNEL);
 	if (!axi)
@@ -737,7 +735,7 @@ int stmmac_acpi_clock_setup(struct plat_stmmacenet_data *plat,
 		plat->clk_ptp_ref = NULL;
 	}
 
-	plat->stmmac_rst = devm_reset_control_get(dev,STMMAC_RESOURCE_NAME);
+	plat->stmmac_rst = devm_reset_control_get(dev, STMMAC_RESOURCE_NAME);
 	if (IS_ERR(plat->stmmac_rst)) {
 		dev_info(dev, "no reset control found\n");
 		plat->stmmac_rst = NULL;
@@ -760,7 +758,7 @@ stmmac_probe_config_acpi(struct platform_device *pdev, const char **mac)
 	if (!plat)
 		return ERR_PTR(-ENOMEM);
 
-	np = dev_fwnode(&(pdev->dev));
+	np = dev_fwnode(&pdev->dev);
 
 	plat->interface = fw_get_phy_mode(np);
 
@@ -776,7 +774,7 @@ stmmac_probe_config_acpi(struct platform_device *pdev, const char **mac)
 
 	/* "snps,phy-addr" is not a standard property. Mark it as deprecated
 	 * and warn of its use. Remove this when PHY node support is added.
-         */
+	 */
 	if (fwnode_property_read_u32(np, "snps,phy-addr", &plat->phy_addr) == 0)
 		dev_warn(&pdev->dev, "snps,phy-addr property is deprecated\n");
 
@@ -812,10 +810,10 @@ stmmac_probe_config_acpi(struct platform_device *pdev, const char **mac)
 				 &plat->multicast_filter_bins);
 	fwnode_property_read_u32(np, "snps,perfect-filter-entries",
 				 &plat->unicast_filter_entries);
-	plat->unicast_filter_entries = dwmac1000_validate_ucast_entries(
-						plat->unicast_filter_entries);
-	plat->multicast_filter_bins = dwmac1000_validate_mcast_bins(
-						plat->multicast_filter_bins);
+	plat->unicast_filter_entries =
+		dwmac1000_validate_ucast_entries(plat->unicast_filter_entries);
+	plat->multicast_filter_bins =
+		dwmac1000_validate_mcast_bins(plat->multicast_filter_bins);
 	plat->has_gmac = 1;
 	plat->pmt = 1;
 
@@ -846,7 +844,7 @@ stmmac_probe_config_acpi(struct platform_device *pdev, const char **mac)
 
 	stmmac_mtl_setup_acpi(pdev, plat);
 
-	stmmac_acpi_clock_setup(plat,pdev);
+	stmmac_acpi_clock_setup(plat, pdev);
 
 	return plat;
 }

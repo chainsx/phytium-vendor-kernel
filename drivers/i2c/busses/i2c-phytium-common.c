@@ -30,7 +30,7 @@ static char *abort_sources[] = {
 	[ABRT_TXDATA_NOACK] =
 		"data not acknowledged",
 	[ABRT_GCALL_NOACK] =
-		"no acknowledgement for a general call",
+		"no acknowledgment for a general call",
 	[ABRT_GCALL_READ] =
 		"read after general call",
 	[ABRT_SBYTE_ACKDET] =

@@ -97,6 +97,28 @@ static bool kvm_is_device_pfn(unsigned long pfn)
 	return !pfn_valid(pfn);
 }
 
+#define KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR GENMASK(5, 2)
+static bool stage2_pte_cacheable(u64 pte)
+{
+	u64 memattr = pte & KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR;
+	return memattr == PAGE_S2_MEMATTR(NORMAL);
+}
+#define KVM_PTE_LEAF_ATTR_HI_S2_XN      BIT(54)
+static bool stage2_pte_executable(u64 pte)
+{
+	return !(pte & KVM_PTE_LEAF_ATTR_HI_S2_XN);
+}
+
+static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+{
+	__clean_dcache_guest_page(pfn, size);
+}
+
+static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+{
+	__invalidate_icache_guest_page(pfn, size);
+}
+
 /**
  * stage2_dissolve_pmd() - clear and flush huge PMD entry
  * @kvm:	pointer to kvm structure.
@@ -1083,6 +1105,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
 		pmd_clear(pmd);
 		kvm_tlb_flush_vmid_ipa(kvm, addr);
 	} else {
+		/* Flush data cache before installation of the new PTE */
+		if (stage2_pte_cacheable(pmd_val(*new_pmd)))
+			kvm_flush_dcache_pmd(*new_pmd);
+
+		if (stage2_pte_executable(pmd_val(*new_pmd)))
+			invalidate_icache_guest_page(pmd_pfn(*new_pmd), S2_PMD_SIZE);
+
 		get_page(virt_to_page(pmd));
 	}
 
@@ -1161,6 +1190,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
 		kvm_set_pte(pte, __pte(0));
 		kvm_tlb_flush_vmid_ipa(kvm, addr);
 	} else {
+		/* Flush data cache before installation of the new PTE */
+		if (stage2_pte_cacheable(pte_val(*new_pte)))
+			kvm_flush_dcache_pte(*new_pte);
+
+		if (stage2_pte_executable(pte_val(*new_pte)))
+			invalidate_icache_guest_page(pte_pfn(*new_pte), PAGE_SIZE);
+
 		get_page(virt_to_page(pte));
 	}
 
@@ -1453,16 +1489,6 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
 }
 
-static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
-{
-	__clean_dcache_guest_page(pfn, size);
-}
-
-static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
-{
-	__invalidate_icache_guest_page(pfn, size);
-}
-
 static void kvm_send_hwpoison_signal(unsigned long address,
 				     struct vm_area_struct *vma)
 {
@@ -1596,12 +1622,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			kvm_set_pfn_dirty(pfn);
 		}
 
-		if (fault_status != FSC_PERM)
-			clean_dcache_guest_page(pfn, PMD_SIZE);
 
 		if (exec_fault) {
 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
-			invalidate_icache_guest_page(pfn, PMD_SIZE);
 		} else if (fault_status == FSC_PERM) {
 			/* Preserve execute if XN was already cleared */
 			if (stage2_is_exec(kvm, fault_ipa))
@@ -1618,12 +1641,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			mark_page_dirty(kvm, gfn);
 		}
 
-		if (fault_status != FSC_PERM)
-			clean_dcache_guest_page(pfn, PAGE_SIZE);
 
 		if (exec_fault) {
 			new_pte = kvm_s2pte_mkexec(new_pte);
-			invalidate_icache_guest_page(pfn, PAGE_SIZE);
 		} else if (fault_status == FSC_PERM) {
 			/* Preserve execute if XN was already cleared */
 			if (stage2_is_exec(kvm, fault_ipa))
@@ -1878,7 +1898,6 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
 	 * We've moved a page around, probably through CoW, so let's treat it
 	 * just like a translation fault and clean the cache to the PoC.
 	 */
-	clean_dcache_guest_page(pfn, PAGE_SIZE);
 	stage2_pte = pfn_pte(pfn, PAGE_S2);
 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
 }
@@ -2245,9 +2264,21 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
 	 * If switching it off, need to clean the caches.
 	 * Clean + invalidate does the trick always.
 	 */
-	if (now_enabled != was_enabled)
-		stage2_flush_vm(vcpu->kvm);
+	if (now_enabled != was_enabled) {
 
+		/*
+		 * Due to Phytium CPU's cache consistency support,
+		 * just flush dcache on one vcpu not all vcpus in the VM.
+		 * This can reduce the number of flush dcaches and
+		 * improve the efficiency of SMP multi-core startup,
+		 * especially for the large VM with hugepages.
+		 */
+		if (read_cpuid_implementor() == ARM_CPU_IMP_PHYTIUM) {
+			if (vcpu->vcpu_id == 0)
+				stage2_flush_vm(vcpu->kvm);
+		} else
+			stage2_flush_vm(vcpu->kvm);
+	}
 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
 	if (now_enabled)
 		*vcpu_hcr(vcpu) &= ~HCR_TVM;

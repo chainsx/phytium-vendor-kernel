@@ -140,7 +140,7 @@ static int phytium_mci_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id phytium_mci_of_ids[] = {
-	{   .compatible =  "phytium,mci", },
+	{ .compatible =  "phytium,mci", },
 	{}
 };
 
@@ -148,8 +148,8 @@ MODULE_DEVICE_TABLE(of, phytium_mci_of_ids);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id phytium_mci_acpi_ids[] = {
-        { .id = "PHYT0017" },
-        { }
+	{ .id = "PHYT0017" },
+	{ }
 };
 
 MODULE_DEVICE_TABLE(acpi, phytium_mci_acpi_ids);
