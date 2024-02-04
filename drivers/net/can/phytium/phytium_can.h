@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Phytium CAN controller driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
  */
 
 #ifndef _PHYTIUM_CAN_H_
@@ -41,9 +41,7 @@ struct phytium_can_devtype {
 
 struct phytium_can_dev {
 	struct can_priv can;
-	unsigned int tx_head;
-	unsigned int tx_tail;
-	unsigned int tx_max;
+
 	struct napi_struct napi;
 	struct net_device *net;
 	struct device *dev;
@@ -52,13 +50,16 @@ struct phytium_can_dev {
 	struct sk_buff *tx_skb;
 
 	const struct can_bittiming_const *bit_timing;
-	spinlock_t lock;
+	spinlock_t lock;		/*spinlock*/
 	int fdmode;
 	u32 isr;
 	u32 tx_fifo_depth;
 	unsigned int is_stop_queue_flag;
-	struct completion comp;
 	void __iomem *base;
+
+	struct timer_list	timer;          /* xmit done timer */
+	u32 is_tx_done;
+	u32 is_need_stop_xmit;
 };
 
 struct phytium_can_dev *phytium_can_allocate_dev(struct device *dev, int sizeof_priv,

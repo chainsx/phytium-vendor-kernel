@@ -257,6 +257,37 @@ static int azx_position_ok(struct azx *chip, struct azx_dev *azx_dev)
 	return 1; /* OK, it's fine */
 }
 
+static int hda_ft_dma_configure(struct device *dev)
+{
+	const struct of_device_id *match_of;
+	const struct acpi_device_id *match_acpi;
+
+	if (dev->of_node) {
+		match_of = of_match_device(dev->driver->of_match_table, dev);
+		if (!match_of) {
+			dev_err(dev, "Error DT match data is missing\n");
+			return -ENODEV;
+		}
+		set_dma_ops(dev, NULL);
+		/*
+		 * Because there is no way to transfer to non-coherent dma in
+		 * of_dma_configure if 'dma-coherent' is described in DT,
+		 * use acpi_dma_configure to alloc dma_ops correctly.
+		 */
+		acpi_dma_configure(dev, DEV_DMA_NON_COHERENT);
+	} else if (has_acpi_companion(dev)) {
+		match_acpi = acpi_match_device(dev->driver->acpi_match_table, dev);
+		if (!match_acpi) {
+			dev_err(dev, "Error ACPI match data is missing\n");
+			return -ENODEV;
+		}
+		set_dma_ops(dev, NULL);
+		acpi_dma_configure(dev, DEV_DMA_NON_COHERENT);
+	}
+
+	return 0;
+}
+
 /* The work for pending PCM period updates. */
 static void azx_irq_pending_work(struct work_struct *work)
 {
@@ -278,9 +309,9 @@ static void azx_irq_pending_work(struct work_struct *work)
 		spin_lock_irq(&bus->reg_lock);
 		list_for_each_entry(s, &bus->stream_list, list) {
 			struct azx_dev *azx_dev = stream_to_azx_dev(s);
+
 			if (!azx_dev->irq_pending ||
-			    !s->substream ||
-			    !s->running)
+			    !s->substream || !s->running)
 				continue;
 			ok = azx_position_ok(chip, azx_dev);
 			if (ok > 0) {
@@ -290,13 +321,14 @@ static void azx_irq_pending_work(struct work_struct *work)
 				spin_lock(&bus->reg_lock);
 			} else if (ok < 0) {
 				pending = 0;	/* too early */
-			} else
+			} else {
 				pending++;
+			}
 		}
 		spin_unlock_irq(&bus->reg_lock);
 		if (!pending)
 			return;
-		msleep(1);
+		udelay(1000);
 	}
 }
 
@@ -309,6 +341,7 @@ static void azx_clear_irq_pending(struct azx *chip)
 	spin_lock_irq(&bus->reg_lock);
 	list_for_each_entry(s, &bus->stream_list, list) {
 		struct azx_dev *azx_dev = stream_to_azx_dev(s);
+
 		azx_dev->irq_pending = 0;
 	}
 	spin_unlock_irq(&bus->reg_lock);
@@ -402,6 +435,7 @@ static LIST_HEAD(card_list);
 static void azx_add_card_list(struct azx *chip)
 {
 	struct hda_ft *hda = container_of(chip, struct hda_ft, chip);
+
 	mutex_lock(&card_list_lock);
 	list_add(&hda->list, &card_list);
 	mutex_unlock(&card_list_lock);
@@ -410,6 +444,7 @@ static void azx_add_card_list(struct azx *chip)
 static void azx_del_card_list(struct azx *chip)
 {
 	struct hda_ft *hda = container_of(chip, struct hda_ft, chip);
+
 	mutex_lock(&card_list_lock);
 	list_del_init(&hda->list);
 	mutex_unlock(&card_list_lock);
@@ -485,10 +520,11 @@ static int azx_resume(struct device *dev)
 		substream = hda->substream;
 
 		if(substream->runtime->status->state == SNDRV_PCM_STATE_SUSPENDED){
-			substream->runtime->status->state = substream->runtime->status->suspended_state;
+			substream->runtime->status->state =
+				substream->runtime->status->suspended_state;
 			err = substream->ops->prepare(substream);
 			if (err < 0)
-			return err;
+				return err;
 		}
 
 		azx_dev = get_azx_dev(substream);
@@ -592,7 +628,7 @@ static const struct dev_pm_ops azx_pm = {
 	SET_RUNTIME_PM_OPS(azx_runtime_suspend, azx_runtime_resume, azx_runtime_idle)
 };
 
-#define hda_ft_pm	&azx_pm
+#define hda_ft_pm	(&azx_pm)
 #else
 #define hda_ft_pm	NULL
 #endif /* CONFIG_PM */
@@ -625,7 +661,7 @@ static int azx_free(struct azx *chip)
 	}
 
 	if (bus->irq >= 0) {
-		free_irq(bus->irq, (void*)chip);
+		free_irq(bus->irq, (void *)chip);
 		bus->irq = -1;
 	}
 
@@ -635,7 +671,7 @@ static int azx_free(struct azx *chip)
 	azx_free_streams(chip);
 	snd_hdac_bus_exit(bus);
 
-	if (chip->region_requested){
+	if (chip->region_requested) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 		size = resource_size(res);
 		devm_release_mem_region(hddev, res->start, size);
@@ -717,6 +753,7 @@ static void check_probe_mask(struct azx *chip, int dev)
 static void azx_probe_work(struct work_struct *work)
 {
 	struct hda_ft *hda = container_of(work, struct hda_ft, probe_work);
+
 	azx_probe_continue(&hda->chip);
 }
 
@@ -781,6 +818,11 @@ static int hda_ft_create(struct snd_card *card, struct platform_device *pdev,
 	if (err < 0) {
 		return err;
 	}
+
+	if (chip->driver_type == AZX_DRIVER_NVIDIA) {
+		dev_dbg(chip->card->dev, "Enable delay in RIRB handling\n");
+		chip->bus.needs_damn_long_delay = 1;
+        }
 
 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
 	if (err < 0) {
@@ -849,6 +891,10 @@ static int azx_first_init(struct azx *chip)
 		else
 			chip->align_buffer_size = 1;
 	}
+ 
+	err = hda_ft_dma_configure(hddev);
+	if (err < 0)
+		return err;
 
 	/* allow 64bit DMA address if supported by H/W */
 	if (!(gcap & AZX_GCAP_64OK))
@@ -1003,6 +1049,7 @@ static int substream_free_pages(struct azx *chip,
 				struct snd_pcm_substream *substream)
 {
 	struct azx_dev *azx_dev = get_azx_dev(substream);
+
 	mark_runtime_wc(chip, azx_dev, substream, false);
 	return snd_pcm_lib_free_pages(substream);
 }
@@ -1060,7 +1107,7 @@ static int hda_ft_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	err = hda_ft_create(card, pdev,dev, driver_flags, &chip);
+	err = hda_ft_create(card, pdev, dev, driver_flags, &chip);
 	if (err < 0)
 		goto out_free;
 	card->private_data = chip;
@@ -1126,7 +1173,7 @@ static int azx_probe_continue(struct azx *chip)
 	snd_hda_set_power_save(&chip->bus, power_save * 1000);
 
 	if (azx_has_pm_runtime(chip))
-			pm_runtime_put_noidle(hddev);
+		pm_runtime_put_noidle(hddev);
 	return err;
 
 out_free:

@@ -66,7 +66,9 @@ static int pmdk_sound_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &pmdk;
 	struct device *dev = &pdev->dev;
+
 	card->dev = dev;
+
 	return devm_snd_soc_register_card(&pdev->dev, card);
 }
 

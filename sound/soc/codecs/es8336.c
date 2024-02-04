@@ -1011,7 +1011,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c,
 				      msecs_to_jiffies(es8336->debounce_time));
 	}
 
-	ret = snd_soc_register_component(&i2c->dev,
+	ret = devm_snd_soc_register_component(&i2c->dev,
 				     &soc_component_dev_es8336,
 				     &es8336_dai, 1);
 
@@ -1020,7 +1020,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c,
 
 static  int es8336_i2c_remove(struct i2c_client *client)
 {
-	kfree(i2c_get_clientdata(client));
+
 	return 0;
 }
 
