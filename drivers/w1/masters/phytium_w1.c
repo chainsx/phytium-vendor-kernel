@@ -2,7 +2,7 @@
 /*
  * Phytium 1-wire bus master driver
  *
- * Copyright (C) 2021-2023, Phytium Technology, Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/acpi.h>

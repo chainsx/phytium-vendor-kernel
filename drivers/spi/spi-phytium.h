@@ -2,7 +2,7 @@
 /*
  * Phytium SPI controller driver.
  *
- * Copyright (c) 2019-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  */
 #ifndef PHYTIUM_SPI_HEADER_H
 #define PHYTIUM_SPI_HEADER_H

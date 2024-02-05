@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (C) Everest Semiconductor Co.,Ltd
- * Copyright (C) 2022-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
 #ifndef _ES8336_H

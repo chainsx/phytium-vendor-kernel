@@ -2,7 +2,7 @@
 /*
  * Driver for Phytium PCIe legacy INTx interrupt controller
  *
- * Copyright (c) 2020-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2020-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/interrupt.h>

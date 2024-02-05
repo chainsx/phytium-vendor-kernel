@@ -2,7 +2,7 @@
 /*
  * Driver for Phytium PCI UART controller
  *
- * Copyright (c) 2021-2023, Phytium Techonology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  *
  * Derived from drivers/tty/serial/amba-pl011.c
  *   Copyright 1999 ARM Limited

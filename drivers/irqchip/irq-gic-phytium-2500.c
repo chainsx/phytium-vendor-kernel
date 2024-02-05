@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2020-2023, Phytium Technology Co., Ltd
+ * Copyright (c) 2020-2024 Phytium Technology Co., Ltd.
  */
 
 #define pr_fmt(fmt)	"GIC-2500: " fmt

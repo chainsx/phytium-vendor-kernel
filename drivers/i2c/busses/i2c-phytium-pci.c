@@ -8,7 +8,7 @@
  *   Copyright (C) 2009 Provigent Ltd.
  *   Copyright (C) 2011, 2015, 2016 Intel Corporation.
  *
- * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/acpi.h>

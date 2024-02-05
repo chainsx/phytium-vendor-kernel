@@ -2,7 +2,7 @@
 /*
  * Special handling for phytium DMA core
  *
- * Copyright (c) 2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2023-2024 Phytium Technology Co., Ltd.
  */
 #include <linux/completion.h>
 #include <linux/dma-mapping.h>

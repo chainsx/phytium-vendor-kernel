@@ -2,7 +2,7 @@
 /*
  * Phytium Quad SPI controller driver.
  *
- * Copyright (c) 2022-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/clk.h>

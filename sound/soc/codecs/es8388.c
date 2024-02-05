@@ -2,7 +2,7 @@
 /*
  * es8388.c -- ES8388 ALSA SoC Audio driver
  *
- * Copyright 2021-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/clk.h>

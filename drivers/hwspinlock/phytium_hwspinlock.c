@@ -2,7 +2,7 @@
 /*
  * Phytium hardware spinlock driver
  *
- * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  *
  * Derived from drivers/hwspinlock/omap_hwspinlock.c
  *   Copyright (C) 2010-2015 Texas Instruments Incorporated - http://www.ti.com

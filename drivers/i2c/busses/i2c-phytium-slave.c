@@ -5,7 +5,7 @@
  * Derived from Synopysys I2C driver.
  *   Copyright (C) 2016 Synopsys Inc.
  *
- * Copyright (C) 2021-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/delay.h>
