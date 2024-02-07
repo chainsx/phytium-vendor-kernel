@@ -12,9 +12,12 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/poll.h>
 #include <linux/regmap.h>
@@ -82,13 +85,26 @@
 #define LPC_ODR4             0x90
 #define LPC_STR4             0x94
 
+#define OBE_POLL_PERIOD      (HZ / 2)
 struct phytium_kcs_bmc {
 	struct kcs_bmc_device kcs_bmc;
 
 	struct regmap *map;
+
+	struct {
+		spinlock_t lock;
+		bool remove;
+		struct timer_list timer;
+	} obe;
 };
 
-static inline struct phytium_kcs_bmc *to_phytium_kcs_bmc(struct kcs_bmc_device *kcs_bmc)
+struct phytium_kcs_of_ops {
+	int (*get_channel)(struct platform_device *pdev);
+	int (*get_io_address)(struct platform_device *pdev, u32 addr);
+};
+
+static inline struct phytium_kcs_bmc *to_phytium_kcs_bmc
+	(struct kcs_bmc_device *kcs_bmc)
 {
 	return container_of(kcs_bmc, struct phytium_kcs_bmc, kcs_bmc);
 }
@@ -114,6 +130,14 @@ static void phytium_kcs_outb(struct kcs_bmc_device *kcs_bmc, u32 reg, u8 data)
 	WARN(rc != 0, "regmap_write() failed: %d\n", rc);
 }
 
+static void phytium_kcs_updateb(struct kcs_bmc_device *kcs_bmc, u32 reg, u8 mask, u8 val)
+{
+	struct phytium_kcs_bmc *priv = to_phytium_kcs_bmc(kcs_bmc);
+	int rc;
+
+	rc = regmap_update_bits(priv->map, reg, mask, val);
+	WARN(rc != 0, "regmap_update_bits() failed: %d\n", rc);
+}
 /*
  * Background:
  *   we note D for Data, and C for Cmd/Status, default rules are
@@ -127,11 +151,11 @@ static void phytium_kcs_outb(struct kcs_bmc_device *kcs_bmc, u32 reg, u8 data)
  *        D / C : CA4h / CA5h
  *        D / C : CB0h / CB1h -use
  */
-static void phytium_kcs_set_address(struct kcs_bmc_device *kcs_bmc, u16 addr)
+static int phytium_kcs_set_address(struct kcs_bmc_device *kcs_bmc, u16 addr)
 {
 	struct phytium_kcs_bmc *priv = to_phytium_kcs_bmc(kcs_bmc);
 
-	switch (kcs_bmc->channel) {
+	switch (priv->kcs_bmc.channel) {
 	case 1:
 		regmap_update_bits(priv->map, LPC_HICR4, LPC_HICR4_LADR12AS, 0);
 		regmap_write(priv->map, LPC_LADR12H, addr >> 8);
@@ -154,6 +178,7 @@ static void phytium_kcs_set_address(struct kcs_bmc_device *kcs_bmc, u16 addr)
 	default:
 		break;
 	}
+	return 0;
 }
 
 static void phytium_kcs_enable_channel(struct kcs_bmc_device *kcs_bmc, bool enable)
@@ -163,34 +188,24 @@ static void phytium_kcs_enable_channel(struct kcs_bmc_device *kcs_bmc, bool enab
 	switch (kcs_bmc->channel) {
 	case 1:
 		if (enable) {
-			regmap_update_bits(priv->map, LPC_HICR2,
-					   LPC_HICR2_IBFIF1, LPC_HICR2_IBFIF1);
 			regmap_update_bits(priv->map, LPC_HICR0,
 					   LPC_HICR0_LPC1E, LPC_HICR0_LPC1E);
 		} else {
 			regmap_update_bits(priv->map, LPC_HICR0,
 					   LPC_HICR0_LPC1E, 0);
-			regmap_update_bits(priv->map, LPC_HICR2,
-					   LPC_HICR2_IBFIF1, 0);
 		}
 		break;
 	case 2:
 		if (enable) {
-			regmap_update_bits(priv->map, LPC_HICR2,
-					LPC_HICR2_IBFIF2, LPC_HICR2_IBFIF2);
 			regmap_update_bits(priv->map, LPC_HICR0,
 					LPC_HICR0_LPC2E, LPC_HICR0_LPC2E);
 		} else {
 			regmap_update_bits(priv->map, LPC_HICR0,
 					LPC_HICR0_LPC2E, 0);
-			regmap_update_bits(priv->map, LPC_HICR2,
-					LPC_HICR2_IBFIF2, 0);
 		}
 		break;
 	case 3:
 		if (enable) {
-			regmap_update_bits(priv->map, LPC_HICR2,
-					   LPC_HICR2_IBFIF3, LPC_HICR2_IBFIF3);
 			regmap_update_bits(priv->map, LPC_HICR0,
 					   LPC_HICR0_LPC3E, LPC_HICR0_LPC3E);
 			regmap_update_bits(priv->map, LPC_HICR4,
@@ -200,8 +215,6 @@ static void phytium_kcs_enable_channel(struct kcs_bmc_device *kcs_bmc, bool enab
 					   LPC_HICR0_LPC3E, 0);
 			regmap_update_bits(priv->map, LPC_HICR4,
 					   LPC_HICR4_KCSENBL, 0);
-			regmap_update_bits(priv->map, LPC_HICR2,
-					   LPC_HICR2_IBFIF3, 0);
 		}
 		break;
 	case 4:
@@ -215,13 +228,78 @@ static void phytium_kcs_enable_channel(struct kcs_bmc_device *kcs_bmc, bool enab
 					   0);
 		break;
 	default:
-		break;
+		pr_warn("%s: Unsupported channel: %d", __func__, kcs_bmc->channel);
+		return;
 	}
 }
 
+static void phytium_kcs_check_obe(struct timer_list *timer)
+{
+	struct phytium_kcs_bmc *priv = container_of(timer, struct phytium_kcs_bmc, obe.timer);
+	unsigned long flags;
+	u8 str;
+
+	spin_lock_irqsave(&priv->obe.lock, flags);
+	if (priv->obe.remove) {
+		spin_unlock_irqrestore(&priv->obe.lock, flags);
+		return;
+	}
+
+	str = phytium_kcs_inb(&priv->kcs_bmc, priv->kcs_bmc.ioreg.str);
+	if (str & KCS_BMC_STR_OBF) {
+		mod_timer(timer, jiffies + OBE_POLL_PERIOD);
+		spin_unlock_irqrestore(&priv->obe.lock, flags);
+		return;
+	}
+	spin_unlock_irqrestore(&priv->obe.lock, flags);
+
+	kcs_bmc_handle_event(&priv->kcs_bmc);
+}
+
+static void phytium_kcs_irq_mask_update(struct kcs_bmc_device *kcs_bmc, u8 mask, u8 state)
+{
+	struct phytium_kcs_bmc *priv = to_phytium_kcs_bmc(kcs_bmc);
+
+	if (mask & KCS_BMC_EVENT_TYPE_OBE) {
+		if (KCS_BMC_EVENT_TYPE_OBE & state)
+			mod_timer(&priv->obe.timer, jiffies + OBE_POLL_PERIOD);
+		else
+			del_timer(&priv->obe.timer);
+	}
+
+	if (mask & KCS_BMC_EVENT_TYPE_IBF) {
+		const bool enable = !!(state & KCS_BMC_EVENT_TYPE_IBF);
+
+		switch (kcs_bmc->channel) {
+		case 1:
+			regmap_update_bits(priv->map, LPC_HICR2, LPC_HICR2_IBFIF1,
+					enable * LPC_HICR2_IBFIF1);
+			return;
+		case 2:
+			regmap_update_bits(priv->map, LPC_HICR2, LPC_HICR2_IBFIF2,
+					enable * LPC_HICR2_IBFIF2);
+			return;
+		case 3:
+			regmap_update_bits(priv->map, LPC_HICR2, LPC_HICR2_IBFIF3,
+					enable * LPC_HICR2_IBFIF3);
+			return;
+		case 4:
+			regmap_update_bits(priv->map, LPC_HICRB, LPC_HICRB_IBFIF4,
+					enable * LPC_HICRB_IBFIF4);
+			return;
+		default:
+			pr_warn("%s: Unsupported channel: %d", __func__, kcs_bmc->channel);
+			return;
+		}
+	}
+}
+
+
 static const struct kcs_bmc_device_ops phytium_kcs_ops = {
+	.irq_mask_update = phytium_kcs_irq_mask_update,
 	.io_inputb = phytium_kcs_inb,
 	.io_outputb = phytium_kcs_outb,
+	.io_updateb = phytium_kcs_updateb,
 };
 
 static irqreturn_t phytium_kcs_irq(int irq, void *arg)
@@ -231,7 +309,8 @@ static irqreturn_t phytium_kcs_irq(int irq, void *arg)
 	return kcs_bmc_handle_event(kcs_bmc);
 }
 
-static int phytium_kcs_config_irq(struct kcs_bmc_device *kcs_bmc, struct platform_device *pdev)
+static int phytium_kcs_config_irq(struct kcs_bmc_device *kcs_bmc,
+		struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int irq;
@@ -249,6 +328,7 @@ static const struct kcs_ioreg phytium_kcs_bmc_ioregs[KCS_CHANNEL_MAX] = {
 	{ .idr = LPC_IDR2, .odr = LPC_ODR2, .str = LPC_STR2 },
 	{ .idr = LPC_IDR3, .odr = LPC_ODR3, .str = LPC_STR3 },
 	{ .idr = LPC_IDR4, .odr = LPC_ODR4, .str = LPC_STR4 },
+
 };
 
 static int phytium_kcs_probe(struct platform_device *pdev)
@@ -256,6 +336,7 @@ static int phytium_kcs_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct phytium_kcs_bmc *priv;
 	struct kcs_bmc_device *kcs_bmc;
+	struct device_node *np;
 	u32 chan, addr;
 	int rc;
 
@@ -264,45 +345,57 @@ static int phytium_kcs_probe(struct platform_device *pdev)
 		dev_err(dev, "no valid 'kcs_chan' configured\n");
 		return -ENODEV;
 	}
-
 	rc = of_property_read_u32(dev->of_node, "kcs_addr", &addr);
 	if (rc) {
 		dev_err(dev, "no valid 'kcs_addr' configured\n");
 		return -ENODEV;
 	}
 
+	np = pdev->dev.of_node;
+
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
 	kcs_bmc = &priv->kcs_bmc;
-	kcs_bmc->dev = dev;
+	kcs_bmc->dev = &pdev->dev;
 	kcs_bmc->channel = chan;
 	kcs_bmc->ioreg = phytium_kcs_bmc_ioregs[chan - 1];
 	kcs_bmc->ops = &phytium_kcs_ops;
 
-	priv->map = syscon_node_to_regmap(dev->parent->of_node);
+	priv->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
 	if (IS_ERR(priv->map)) {
-		dev_err(dev, "Couldn't get regmap\n");
+		dev_err(&pdev->dev, "Couldn't get regmap\n");
 		return -ENODEV;
 	}
 
-	platform_set_drvdata(pdev, priv);
+	spin_lock_init(&priv->obe.lock);
+	priv->obe.remove = false;
+	timer_setup(&priv->obe.timer, phytium_kcs_check_obe, 0);
 
-	phytium_kcs_set_address(kcs_bmc, addr);
-	phytium_kcs_enable_channel(kcs_bmc, true);
+	rc = phytium_kcs_set_address(kcs_bmc, addr);
+	if (rc)
+		return rc;
+
 	rc = phytium_kcs_config_irq(kcs_bmc, pdev);
 	if (rc)
 		return rc;
 
+	platform_set_drvdata(pdev, priv);
+
+	phytium_kcs_irq_mask_update(kcs_bmc, (KCS_BMC_EVENT_TYPE_IBF | KCS_BMC_EVENT_TYPE_OBE), 0);
+
+	phytium_kcs_enable_channel(kcs_bmc, true);
+
 	rc = kcs_bmc_add_device(&priv->kcs_bmc);
 	if (rc) {
-		dev_err(dev, "Unable to register device\n");
+		dev_warn(&pdev->dev, "Failed to register channel %d: %d\n",
+				kcs_bmc->channel, rc);
 		return rc;
 	}
 
-	pr_info("channel=%u addr=0x%x idr=0x%x odr=0x%x str=0x%x\n",
-		chan, addr, kcs_bmc->ioreg.idr, kcs_bmc->ioreg.odr, kcs_bmc->ioreg.str);
+	dev_info(&pdev->dev, "Initialised channel %d at 0x%x\n",
+			kcs_bmc->channel, addr);
 
 	return 0;
 }
@@ -313,12 +406,18 @@ static int phytium_kcs_remove(struct platform_device *pdev)
 	struct kcs_bmc_device *kcs_bmc = &priv->kcs_bmc;
 
 	kcs_bmc_remove_device(kcs_bmc);
+	phytium_kcs_enable_channel(kcs_bmc, false);
+	phytium_kcs_irq_mask_update(kcs_bmc, (KCS_BMC_EVENT_TYPE_IBF | KCS_BMC_EVENT_TYPE_OBE), 0);
 
+	spin_lock_irq(&priv->obe.lock);
+	priv->obe.remove = true;
+	spin_unlock_irq(&priv->obe.lock);
+	del_timer_sync(&priv->obe.timer);
 	return 0;
 }
 
 static const struct of_device_id phytium_kcs_bmc_match[] = {
-	{ .compatible = "phytium,kcs-bmc" },
+	{ .compatible = "phytium,kcs-bmc", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, phytium_kcs_bmc_match);

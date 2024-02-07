@@ -134,7 +134,7 @@ static void phytium_mci_send_cmd(struct phytium_mci_host *host, u32 cmd, u32 arg
 	rc = readl_relaxed_poll_timeout(host->base + MCI_STATUS,
 					 data,
 					 !(data & MCI_STATUS_CARD_BUSY),
-					 0, 100 * 1000);
+					 0, 5000 * 1000);
 	if (rc == -ETIMEDOUT)
 		pr_debug("%s %d, timeout mci_status: 0x%08x\n", __func__, __LINE__, data);
 
@@ -143,7 +143,7 @@ static void phytium_mci_send_cmd(struct phytium_mci_host *host, u32 cmd, u32 arg
 	rc = readl_relaxed_poll_timeout(host->base + MCI_CMD,
 					 data,
 					 !(data & MCI_CMD_START),
-					 0, 100 * 1000);
+					 0, 5000 * 1000);
 	if (rc == -ETIMEDOUT)
 		pr_debug("%s %d, timeout mci_cmd: 0x%08x\n", __func__, __LINE__, data);
 }

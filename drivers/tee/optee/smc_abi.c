@@ -1428,7 +1428,7 @@ static void optee_smccc_hvc(unsigned long a0, unsigned long a1,
 #if defined(CONFIG_OPTEE_DEFAULT_METHOD_HVC)
 #define DEFAULT_CONDUIT_METHOD optee_smccc_hvc
 #elif defined(CONFIG_OPTEE_DEFAULT_METHOD_SMC)
-#define DEFAULT_CONDUIT_METHOD optee_smccc_hvc
+#define DEFAULT_CONDUIT_METHOD optee_smccc_smc
 #else
 #define DEFAULT_CONDUIT_METHOD ERR_PTR(-ENXIO)
 #endif
