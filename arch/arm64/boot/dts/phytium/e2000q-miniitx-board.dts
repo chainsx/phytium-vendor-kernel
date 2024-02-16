@@ -14,7 +14,7 @@
 
 /dts-v1/;
 /memreserve/ 0x80000000 0x10000;
-/memreserve/ 0xf4000000 0x4000000;
+
 
 #include "pe2204.dtsi"
 
@@ -38,6 +38,19 @@
 		reg = <0x0 0x80000000 0x2 0x00000000>;
 	};
 
+	reserved-memory {
+				#address-cells = <2>;
+				#size-cells = <2>;
+				ranges;
+				
+				phytium_display_reserved: share@0xf4000000 {
+					compatible = "phytium-display-carveout-mem";
+					device_type = "display";
+					reg = <0x00 0xf4000000 0x0 0x4000000>; 
+					status = "okay";            
+				};
+	};
+  
 	sound_card: sound {
         compatible = "simple-audio-card";
         simple-audio-card,format = "i2s";
