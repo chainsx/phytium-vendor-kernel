@@ -19,14 +19,23 @@
 int phytium_platform_carveout_mem_init(struct platform_device *pdev,
 						      struct phytium_display_private *priv)
 {
-	struct resource *res;
-	int ret = 0;
+   	struct resource *res;
+    struct resource *mem_region;
+    int ret = 0;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (res) {
-		priv->pool_size = resource_size(res);
-		priv->pool_phys_addr = res->start;
-	}
+    res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+    if (res) {
+        mem_region = request_mem_region(res->start, resource_size(res), "phytium-display");
+        if (!mem_region) {
+            DRM_WARN("Failed to request reserved memory\n");
+            priv->pool_size = resource_size(res);
+            priv->pool_phys_addr = res->start;
+        }
+        else {
+            priv->pool_size = resource_size(mem_region);
+            priv->pool_phys_addr = mem_region->start;
+        }
+    }
 
 	if ((priv->pool_phys_addr != 0) && (priv->pool_size != 0)) {
 		priv->pool_virt_addr = ioremap_cache(priv->pool_phys_addr, priv->pool_size);
@@ -54,6 +63,7 @@ int phytium_platform_carveout_mem_init(struct platform_device *pdev,
 failed_init_memory_pool:
 	iounmap(priv->pool_virt_addr);
 failed_ioremap:
+	release_mem_region(mem_region->start, resource_size(mem_region));
 	return ret;
 }
 
