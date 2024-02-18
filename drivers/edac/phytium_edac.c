@@ -2,7 +2,7 @@
 /*
  * Phytium Pe220x EDAC (error detection and correction)
  *
- * Copyright (c) 2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2023-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/ctype.h>
