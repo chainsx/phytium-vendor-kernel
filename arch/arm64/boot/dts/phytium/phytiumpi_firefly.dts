@@ -2,7 +2,7 @@
 /*
  * DTS file for Phytium Pi development board.
  *
- * Copyright (C) 2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2023-2024 Phytium Technology Co., Ltd.
  *
  * Shaojun Yang <yangshaojun@phytium.com.cn>
  */

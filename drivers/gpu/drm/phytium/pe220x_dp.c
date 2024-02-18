@@ -2,7 +2,7 @@
 /*
  * Phytium display port DRM driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include "phytium_display_drv.h"

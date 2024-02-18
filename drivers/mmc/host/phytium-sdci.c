@@ -2,7 +2,7 @@
 /*
  * Phytium SD Card Interface dirver
  *
- * Copyright (c) 2019-2023, Phytium Technology Co.,Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/module.h>

@@ -2,7 +2,7 @@
 /*
  * Phytium Multimedia Card Interface PCI driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/module.h>

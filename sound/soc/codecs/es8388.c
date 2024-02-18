@@ -2,7 +2,7 @@
 /*
  * es8388.c  --  ES8388 ALSA SoC Audio driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  * Author: Yiqun Zhang <zhangyiqun@phytium.com.cn>
  *
  * This program is free software; you can redistribute it and/or modify

@@ -2,7 +2,7 @@
 /*
  * Phytium SD Card Interface driver
  *
- * Copyright (c) 2019-2023, Phytium Technology Co.,Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  */
 
 /*---------------------------------------------------------------------------*/

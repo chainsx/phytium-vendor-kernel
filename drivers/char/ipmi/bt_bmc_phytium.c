@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  *
  * Derived from drivers/char/ipmi/bt-bmc.c
  *   Copyright (c) 2015-2016, IBM Corporation.

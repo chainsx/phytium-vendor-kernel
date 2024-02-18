@@ -2,7 +2,7 @@
 /*
  * dts file for Phytium Pe2201 SoC
  *
- * Copyright (c) 2022-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
 #include "pe220x.dtsi"

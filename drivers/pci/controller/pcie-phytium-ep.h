@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Phytium pd2008 pcie endpoint driver
  *
- * Copyright (c) 2021 Phytium Limited.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  *
  * Author:
  *	Yang Xun <yangxun@phytium.com.cn>

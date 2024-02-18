@@ -2,7 +2,7 @@
 /*
  * Phytium Device DDMA Controller driver.
  *
- * Copyright (c) 2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2023-2024 Phytium Technology Co., Ltd.
  */
 
 #ifndef _PHYTIUM_DDMAC_H

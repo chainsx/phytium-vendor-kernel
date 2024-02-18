@@ -2,7 +2,7 @@
 /*
  * Phytium I2S ASoC driver
  *
- * Copyright (c) 2020-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2020-2024 Phytium Technology Co., Ltd.
  *
  * Derived from sound/soc/dwc/dwc-i2s.c
  *    Copyright (C) 2010 ST Microelectronics

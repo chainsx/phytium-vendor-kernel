@@ -2,7 +2,7 @@
 /*
  * dts file for Phytium Pe220x SoC
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
