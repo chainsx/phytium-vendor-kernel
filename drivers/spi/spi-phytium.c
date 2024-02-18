@@ -1,7 +1,7 @@
 /*
  * Phytium SPI core controller driver.
  *
- * Copyright (c) 2019-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  *
  * Derived from drivers/spi/spi-dw-pci.c
  *   Copyright (c) 2009, 2014 Intel Corporation.
