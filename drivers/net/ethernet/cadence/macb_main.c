@@ -2709,6 +2709,15 @@ static void gem_init_rings(struct macb *bp)
 		queue->tx_head = 0;
 		queue->tx_tail = 0;
 
+		for (i = 0; i < bp->rx_ring_size; i++) {
+			desc = macb_rx_desc(queue, i);
+			desc->ctrl = 0;
+			/* make sure ctrl is cleared first,
+			 * and bit RX_USED is set to avoid a race.
+			 */
+			dma_wmb();
+			desc->addr |= MACB_BIT(RX_USED);
+		}
 		queue->rx_tail = 0;
 		queue->rx_prepared_head = 0;
 
