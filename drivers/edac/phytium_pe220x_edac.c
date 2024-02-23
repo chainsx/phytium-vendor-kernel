@@ -13,6 +13,7 @@
 #include <linux/of_address.h>
 #include <linux/uaccess.h>
 #include <ras/ras_event.h>
+#include <linux/uuid.h>
 #include "edac_module.h"
 
 #define EDAC_MOD_STR		"phytium_edac"
@@ -329,8 +330,8 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 				      err_info[error_id].error_str);
 		/* Report the error via the trace interface */
 		if (IS_ENABLED(CONFIG_RAS))
-			trace_non_standard_event(
-				&NULL_UUID_LE, &NULL_UUID_LE, EDAC_MOD_STR,
+			trace_non_standard_event( (guid_t *)&NULL_UUID_LE,
+				(guid_t *)&NULL_UUID_LE, EDAC_MOD_STR,
 				SEV_RECOVERABLE, err_info[error_id].error_str,
 				strlen(err_info[error_id].error_str));
 	} else {
@@ -339,8 +340,8 @@ static void phytium_edac_error_report(struct phytium_edac *edac,
 		edac_device_handle_ce(edac->edac_dev, 0, 0,
 				      err_info[error_id].error_str);
 		if (IS_ENABLED(CONFIG_RAS))
-			trace_non_standard_event(
-				&NULL_UUID_LE, &NULL_UUID_LE, EDAC_MOD_STR,
+			trace_non_standard_event( (guid_t *)&NULL_UUID_LE,
+				(guid_t *)&NULL_UUID_LE, EDAC_MOD_STR,
 				SEV_CORRECTED, err_info[error_id].error_str,
 				strlen(err_info[error_id].error_str));
 	}
