@@ -46,6 +46,9 @@ struct sifive_fu540_macb_mgmt {
 	struct clk_hw hw;
 };
 
+#define MAX_RING_ADDR_ALLOC_TIMES 3
+#define RING_ADDR_INTERVAL 128
+
 #define MACB_RX_BUFFER_SIZE	128
 #define RX_BUFFER_MULTIPLE	64  /* bytes */
 
@@ -2590,27 +2593,48 @@ static void macb_free_rx_buffers(struct macb *bp)
 
 static void macb_free_consistent(struct macb *bp)
 {
+	struct macb_dma_desc *tx_ring_base = NULL;
+	struct macb_dma_desc *rx_ring_base = NULL;
+	dma_addr_t tx_ring_base_addr;
+	dma_addr_t rx_ring_base_addr;
 	struct macb_queue *queue;
 	unsigned int q;
 	int size;
 
 	bp->macbgem_ops.mog_free_rx_buffers(bp);
 
+	queue = bp->queues;
+	if (queue->tx_ring) {
+		tx_ring_base = queue->tx_ring;
+		tx_ring_base_addr = queue->tx_ring_dma;
+	}
+	if (queue->rx_ring) {
+		rx_ring_base = queue->rx_ring;
+		rx_ring_base_addr = queue->rx_ring_dma;
+	}
+
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 		kfree(queue->tx_skb);
 		queue->tx_skb = NULL;
-		if (queue->tx_ring) {
-			size = TX_RING_BYTES(bp) + bp->tx_bd_rd_prefetch;
-			dma_free_coherent(&bp->pdev->dev, size,
-					  queue->tx_ring, queue->tx_ring_dma);
+		if (queue->tx_ring)
 			queue->tx_ring = NULL;
-		}
-		if (queue->rx_ring) {
-			size = RX_RING_BYTES(bp) + bp->rx_bd_rd_prefetch;
-			dma_free_coherent(&bp->pdev->dev, size,
-					  queue->rx_ring, queue->rx_ring_dma);
+		if (queue->rx_ring)
 			queue->rx_ring = NULL;
-		}
+	}
+
+	if (tx_ring_base) {
+		size = bp->num_queues * (TX_RING_BYTES(bp) +
+					 bp->tx_bd_rd_prefetch +
+					 RING_ADDR_INTERVAL);
+		dma_free_coherent(&bp->pdev->dev, size, tx_ring_base,
+				  tx_ring_base_addr);
+	}
+	if (rx_ring_base) {
+		size = bp->num_queues * (RX_RING_BYTES(bp) +
+					 bp->rx_bd_rd_prefetch +
+					 RING_ADDR_INTERVAL);
+		dma_free_coherent(&bp->pdev->dev, size, rx_ring_base,
+				  rx_ring_base_addr);
 	}
 }
 
@@ -2650,17 +2674,87 @@ static int macb_alloc_rx_buffers(struct macb *bp)
 	return 0;
 }
 
+static int macb_queue_phyaddr_check(struct macb *bp, dma_addr_t ring_base_addr,
+				    int offset)
+{
+	u32 bus_addr_high;
+	int i;
+
+	bus_addr_high = upper_32_bits(ring_base_addr);
+	for (i = 1; i < bp->num_queues; i++) {
+		ring_base_addr += offset;
+		if (bus_addr_high != upper_32_bits(ring_base_addr))
+			return -1;
+	}
+
+	return 0;
+}
+
 static int macb_alloc_consistent(struct macb *bp)
 {
+	struct macb_dma_desc *tx_ring_base, *rx_ring_base;
+	dma_addr_t tx_ring_base_addr, rx_ring_base_addr;
 	struct macb_queue *queue;
+	int tx_offset, rx_offset;
+	int tx_size, rx_size;
 	unsigned int q;
+	int ret, i;
 	int size;
 
+	tx_offset = TX_RING_BYTES(bp) + bp->tx_bd_rd_prefetch +
+		    RING_ADDR_INTERVAL;
+	tx_size = bp->num_queues * tx_offset;
+	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
+		if (i == MAX_RING_ADDR_ALLOC_TIMES)
+			return -ENOMEM;
+
+		tx_ring_base = dma_alloc_coherent(&bp->pdev->dev, tx_size,
+						  &tx_ring_base_addr,
+						  GFP_KERNEL);
+		if (!tx_ring_base)
+			continue;
+
+		ret = macb_queue_phyaddr_check(bp, tx_ring_base_addr,
+					       tx_offset);
+		if (ret) {
+			dma_free_coherent(&bp->pdev->dev, tx_size, tx_ring_base,
+					  tx_ring_base_addr);
+			continue;
+		} else {
+			break;
+		}
+	}
+
+	rx_offset = RX_RING_BYTES(bp) + bp->rx_bd_rd_prefetch +
+		    RING_ADDR_INTERVAL;
+	rx_size = bp->num_queues * rx_offset;
+	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
+		if (i == MAX_RING_ADDR_ALLOC_TIMES) {
+			dma_free_coherent(&bp->pdev->dev, tx_size, tx_ring_base,
+					  tx_ring_base_addr);
+			return -ENOMEM;
+		}
+
+		rx_ring_base = dma_alloc_coherent(&bp->pdev->dev, rx_size,
+						  &rx_ring_base_addr,
+						  GFP_KERNEL);
+		if (!rx_ring_base)
+			continue;
+
+		ret = macb_queue_phyaddr_check(bp, rx_ring_base_addr,
+					       rx_offset);
+		if (ret) {
+			dma_free_coherent(&bp->pdev->dev, rx_size, rx_ring_base,
+					  rx_ring_base_addr);
+			continue;
+		} else {
+			break;
+		}
+	}
+
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
-		size = TX_RING_BYTES(bp) + bp->tx_bd_rd_prefetch;
-		queue->tx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
-						    &queue->tx_ring_dma,
-						    GFP_KERNEL);
+		queue->tx_ring = (void *)tx_ring_base + q * tx_offset;
+		queue->tx_ring_dma = tx_ring_base_addr + q * tx_offset;
 		if (!queue->tx_ring)
 			goto out_err;
 		netdev_dbg(bp->dev,
@@ -2669,13 +2763,12 @@ static int macb_alloc_consistent(struct macb *bp)
 			   queue->tx_ring);
 
 		size = bp->tx_ring_size * sizeof(struct macb_tx_skb);
-		queue->tx_skb = kmalloc(size, GFP_KERNEL);
+		queue->tx_skb = kzalloc(size, GFP_KERNEL);
 		if (!queue->tx_skb)
 			goto out_err;
 
-		size = RX_RING_BYTES(bp) + bp->rx_bd_rd_prefetch;
-		queue->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
-						 &queue->rx_ring_dma, GFP_KERNEL);
+		queue->rx_ring = (void *)rx_ring_base + q * rx_offset;
+		queue->rx_ring_dma = rx_ring_base_addr + q * rx_offset;
 		if (!queue->rx_ring)
 			goto out_err;
 		netdev_dbg(bp->dev,
