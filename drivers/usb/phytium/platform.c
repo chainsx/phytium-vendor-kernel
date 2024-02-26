@@ -20,12 +20,14 @@ static const struct of_device_id phytium_otg_of_match[] = {
 	},
 	{},
 };
+MODULE_DEVICE_TABLE(of, phytium_otg_of_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id phytium_otg_acpi_match[] = {
 	{ "PHYT0037", 0 },
 	{ }
 };
+MODULE_DEVICE_TABLE(acpi, phytium_otg_acpi_match);
 #endif
 
 static int phytium_get_dr_mode(struct phytium_cusb *config)
