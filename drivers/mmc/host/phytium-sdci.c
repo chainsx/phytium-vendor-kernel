@@ -455,7 +455,7 @@ static void phytium_sdci_request_done(struct phytium_sdci_host *host,
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	phytium_sdci_track_cmd_data(host, mrq->cmd, mrq->data);
-	if (mrq->data)
+	if (mrq->data && host->adtc_type != COMMOM_ADTC)
 		phytium_sdci_unprepare_data(host, mrq);
 	mmc_request_done(host->mmc, mrq);
 }
@@ -727,12 +727,12 @@ static void phytium_sdci_ops_request(struct mmc_host *mmc,
 	}
 
 	if (mrq->data) {
-		phytium_sdci_prepare_data(host, mrq);
 		if (mrq->cmd->opcode == MMC_READ_MULTIPLE_BLOCK ||
 		    mrq->cmd->opcode == MMC_READ_SINGLE_BLOCK ||
 		    mrq->cmd->opcode == MMC_WRITE_MULTIPLE_BLOCK ||
 		    mrq->cmd->opcode == MMC_WRITE_BLOCK) {
 			host->adtc_type = BLOCK_RW_ADTC;
+			phytium_sdci_prepare_data(host, mrq);
 			phytium_sdci_start_data(host, mrq,
 						mrq->cmd, mrq->data);
 			return;
