@@ -857,7 +857,7 @@ static bool phytium_sdci_data_xfer_done(struct phytium_sdci_host *host,
 }
 
 
-static int phytium_sdci_card_busy(struct mmc_host *mmc)
+__maybe_unused static int phytium_sdci_card_busy(struct mmc_host *mmc)
 {
 	struct phytium_sdci_host *host = mmc_priv(mmc);
 	u32 status;
@@ -1140,7 +1140,6 @@ static struct mmc_host_ops phytium_sdci_ops = {
 	.request = phytium_sdci_ops_request,
 	.set_ios = phytium_sdci_ops_set_ios,
 	.get_cd = phytium_sdci_get_cd,
-	.card_busy = phytium_sdci_card_busy,
 	.card_hw_reset = phytium_sdci_hw_reset,
 };
 
