@@ -3209,6 +3209,9 @@ static void arm_smmu_resume_msis(struct arm_smmu_device *smmu)
 	struct msi_desc *desc;
 	struct device *dev = smmu->dev;
 
+	if (!dev->msi.domain)
+		return;
+
 	msi_for_each_desc(desc, dev, MSI_DESC_ASSOCIATED) {
 		switch (desc->msi_index) {
 		case EVTQ_MSI_INDEX:
