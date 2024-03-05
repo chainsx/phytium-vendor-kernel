@@ -17464,6 +17464,8 @@ F:	drivers/gpio/gpio-phytium-sgpio.c
 F:	drivers/gpu/drm/phytium/*
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
+F:	drivers/i3c/master/i3c-master-acpi.c
+F:	drivers/i3c/master/i3c-master-acpi.h
 F:	drivers/i3c/master/i3c-master-phytium.c
 F:	drivers/iio/adc/phytium-adc.c
 F:	drivers/input/keyboard/phytium-keypad.c
