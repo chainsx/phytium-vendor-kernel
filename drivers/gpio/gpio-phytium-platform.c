@@ -78,7 +78,9 @@ static int phytium_gpio_probe(struct platform_device *pdev)
 		}
 
 		if (fwnode_property_read_u32(fwnode, "ngpios",
-					     &gpio->ngpio[idx])) {
+					&gpio->ngpio[idx])
+				&& fwnode_property_read_u32(fwnode, "nr-gpios",
+					&gpio->ngpio[idx])) {
 			dev_info(dev,
 				 "failed to get number of gpios for Port%c\n",
 				 idx ? 'B' : 'A');
