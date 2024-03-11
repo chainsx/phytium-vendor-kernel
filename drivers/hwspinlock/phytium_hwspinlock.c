@@ -148,19 +148,19 @@ static int phytium_hwspinlock_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_ACPI
-static const struct acpi_device_id phytium_hwspinlock_acpi_ids[] = {
-       { "PHYT0027", 0 },
-       { /* sentinel */ },
-};
-MODULE_DEVICE_TABLE(acpi, phytium_hwspinlock_acpi_ids);
-#endif
-
 static const struct of_device_id phytium_hwspinlock_of_match[] = {
 	{ .compatible = "phytium,hwspinlock", },
 	{ /* end */ },
 };
 MODULE_DEVICE_TABLE(of, phytium_hwspinlock_of_match);
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_hwspinlock_acpi_match[] = {
+	{ "PHYT0053", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, phytium_hwspinlock_acpi_match);
+#endif
 
 static struct platform_driver phytium_hwspinlock_driver = {
 	.probe		= phytium_hwspinlock_probe,
@@ -168,7 +168,7 @@ static struct platform_driver phytium_hwspinlock_driver = {
 	.driver		= {
 		.name	= "phytium_hwspinlock",
 		.of_match_table = of_match_ptr(phytium_hwspinlock_of_match),
-		.acpi_match_table = ACPI_PTR(phytium_hwspinlock_acpi_ids),
+		.acpi_match_table = ACPI_PTR(phytium_hwspinlock_acpi_match),
 	},
 };
 
