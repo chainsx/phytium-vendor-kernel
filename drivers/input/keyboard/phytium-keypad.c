@@ -394,20 +394,20 @@ open_err:
 	return -EIO;
 }
 
-#ifdef CONFIG_ACPI
-static const struct acpi_device_id phytium_keypad_acpi_ids[] = {
-       { "PHYT0028", 0 },
-       { /* sentinel */ },
-};
-MODULE_DEVICE_TABLE(acpi, phytium_keypad_acpi_ids);
-#endif
-
 #ifdef CONFIG_OF
 static const struct of_device_id phytium_keypad_of_match[] = {
 	{ .compatible = "phytium,keypad", },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, phytium_keypad_of_match);
+#endif
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id phytium_keypad_acpi_match[] = {
+	{ "PHYT0028", 0},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, phytium_keypad_acpi_match);
 #endif
 
 static int phytium_keypad_probe(struct platform_device *pdev)
@@ -570,7 +570,7 @@ static struct platform_driver phytium_keypad_driver = {
 		.name	= "phytium-keypad",
 		.pm	= &phytium_keypad_pm_ops,
 		.of_match_table = of_match_ptr(phytium_keypad_of_match),
-		.acpi_match_table = ACPI_PTR(phytium_keypad_acpi_ids),
+		.acpi_match_table = ACPI_PTR(phytium_keypad_acpi_match),
 	},
 	.probe      = phytium_keypad_probe,
 	.remove     = phytium_keypad_remove,
