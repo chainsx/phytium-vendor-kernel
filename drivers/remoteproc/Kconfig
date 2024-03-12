@@ -365,6 +365,12 @@ config XLNX_R5_REMOTEPROC
 
 	  It's safe to say N if not interested in using RPU r5f cores.
 
+config HOMO_REMOTEPROC
+	bool "homogeneous remoteproc support"
+	select RPMSG_VIRTIO
+	help
+	  Say y here to support homogeneous processors via the remote processor framework.
+
 endif # REMOTEPROC
 
 endmenu

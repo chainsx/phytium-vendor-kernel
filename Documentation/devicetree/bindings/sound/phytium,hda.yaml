@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sound/phytium,hda.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Phytium HDA controller
+
+description: |
+  The High Definition Audio (HDA) block provides a serial interface to
+  audio codec. It supports multiple input and output streams.
+
+maintainers:
+  - Chen Baozi <chenbaozi@phytium.com.cn>
+
+properties:
+  compatible:
+    - const: phytium,hda
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    description: The interrupt from the HDA controller
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    items:
+      - const: phytium_hda_clk
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - clock-names
+
+additionalProperties: false
+
+examples:
+  - |
+    hda: hda@28206000 {
+       compatible = "phytium,hda";
+       reg = <0 0x28206000 0x0 0x1000>;
+       interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+       clocks = <&sysclk_48mhz>;
+       clock-names = "phytium_hda_clk";
+    };
