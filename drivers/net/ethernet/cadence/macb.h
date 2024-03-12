@@ -85,6 +85,7 @@
 #define GEM_PBUFRXCUT		0x0044 /* RX Partial Store and Forward */
 #define GEM_JML			0x0048 /* Jumbo Max Length */
 #define GEM_HS_MAC_CONFIG	0x0050 /* GEM high speed config */
+#define GEM_AXI_PIPE		0x0054 /* AXI max pipeline register*/
 #define GEM_HRB			0x0080 /* Hash Bottom */
 #define GEM_HRT			0x0084 /* Hash Top */
 #define GEM_SA1B		0x0088 /* Specific1 Bottom */
@@ -220,6 +221,31 @@
 #define GEM_IDR(hw_q)		(0x0620 + ((hw_q) << 2))
 #define GEM_IMR(hw_q)		(0x0640 + ((hw_q) << 2))
 
+#define GEM_SRC_SEL_LN			0x1C04
+#define GEM_DIV_SEL0_LN			0x1C08
+#define GEM_DIV_SEL1_LN			0x1C0C
+#define GEM_PMA_XCVR_POWER_STATE	0x1C10
+#define GEM_SPEED_MODE			0x1C14
+#define GEM_MII_SELECT			0x1C18
+#define GEM_SEL_MII_ON_RGMII		0x1C1C
+#define GEM_TX_CLK_SEL0			0x1C20
+#define GEM_TX_CLK_SEL1			0x1C24
+#define GEM_TX_CLK_SEL2			0x1C28
+#define GEM_TX_CLK_SEL3			0x1C2C
+#define GEM_RX_CLK_SEL0			0x1C30
+#define GEM_RX_CLK_SEL1			0x1C34
+#define GEM_CLK_250M_DIV10_DIV100_SEL	0x1C38
+#define GEM_TX_CLK_SEL5			0x1C3C
+#define GEM_TX_CLK_SEL6			0x1C40
+#define GEM_RX_CLK_SEL4			0x1C44
+#define GEM_RX_CLK_SEL5			0x1C48
+#define GEM_TX_CLK_SEL3_0		0x1C70
+#define GEM_TX_CLK_SEL4_0		0x1C74
+#define GEM_RX_CLK_SEL3_0		0x1C78
+#define GEM_RX_CLK_SEL4_0		0x1C7C
+#define GEM_RGMII_TX_CLK_SEL0		0x1C80
+#define GEM_RGMII_TX_CLK_SEL1		0x1C84
+
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET		0 /* reserved */
 #define MACB_LB_SIZE		1
@@ -254,6 +280,8 @@
 #define MACB_OSSMODE_SIZE	1
 #define MACB_MIIONRGMII_OFFSET	28 /* MII Usage on RGMII Interface */
 #define MACB_MIIONRGMII_SIZE	1
+#define MACB_2PT5G_OFFSET	29 /* 2.5G operation selected */
+#define MACB_2PT5G_SIZE		1
 
 /* Bitfields in NCFGR */
 #define MACB_SPD_OFFSET		0 /* Speed */
@@ -562,6 +590,8 @@
 #define GEM_RX_SCR_BYPASS_SIZE			1
 #define GEM_TX_SCR_BYPASS_OFFSET		8
 #define GEM_TX_SCR_BYPASS_SIZE			1
+#define GEM_RX_SYNC_RESET_OFFSET		2
+#define GEM_RX_SYNC_RESET_SIZE			1
 #define GEM_TX_EN_OFFSET			1
 #define GEM_TX_EN_SIZE				1
 #define GEM_SIGNAL_OK_OFFSET			0
@@ -741,6 +771,7 @@
 #define MACB_CAPS_GIGABIT_MODE_AVAILABLE	0x20000000
 #define MACB_CAPS_SG_DISABLED			0x40000000
 #define MACB_CAPS_MACB_IS_GEM			0x80000000
+#define MACB_CAPS_SEL_CLK_HW			0x00001000
 
 /* LSO settings */
 #define MACB_LSO_UFO_ENABLE			0x01
@@ -1282,6 +1313,8 @@ struct macb {
 	struct phylink_config	phylink_config;
 	struct phylink_pcs	phylink_usx_pcs;
 	struct phylink_pcs	phylink_sgmii_pcs;
+	struct ncsi_dev		*ndev;
+	int			use_ncsi;
 
 	u32			caps;
 	unsigned int		dma_burst_length;

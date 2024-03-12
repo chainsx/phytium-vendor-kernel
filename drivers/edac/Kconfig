@@ -561,4 +561,11 @@ config EDAC_NPCM
 	  error detection (in-line ECC in which a section 1/8th of the memory
 	  device used to store data is used for ECC storage).
 
+config EDAC_PHYTIUM_PE220X
+	tristate "Phytium Pe220x SoC"
+	depends on ARCH_PHYTIUM
+	help
+	  Support for error detection and correction on the
+	  Phytium Pe220x family of SOCs.
+
 endif # EDAC

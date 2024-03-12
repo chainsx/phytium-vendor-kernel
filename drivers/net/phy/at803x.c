@@ -868,6 +868,9 @@ static int at803x_probe(struct phy_device *phydev)
 	if (ret)
 		return ret;
 
+	/* dwmac-phytium need disable hibernate mode */
+	priv->flags |= AT803X_DISABLE_HIBERNATION_MODE;
+
 	if (phydev->drv->phy_id == ATH8031_PHY_ID) {
 		int ccr = phy_read(phydev, AT803X_REG_CHIP_CONFIG);
 		int mode_cfg;

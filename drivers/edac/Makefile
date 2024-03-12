@@ -86,3 +86,4 @@ obj-$(CONFIG_EDAC_BLUEFIELD)		+= bluefield_edac.o
 obj-$(CONFIG_EDAC_DMC520)		+= dmc520_edac.o
 obj-$(CONFIG_EDAC_NPCM)			+= npcm_edac.o
 obj-$(CONFIG_EDAC_ZYNQMP)		+= zynqmp_edac.o
+obj-$(CONFIG_EDAC_PHYTIUM_PE220X)	+= phytium_pe220x_edac.o

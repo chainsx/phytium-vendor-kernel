@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sound/phytium,i2s.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Phytium I2S controller
+
+maintainers:
+  - Chen Baozi <chenbaozi@phytium.com.cn>
+
+properties:
+  compatible:
+    const: phytium,i2s
+
+  reg:
+    maxItems: 2
+    description: |
+      It contains two register region. The first one is for physical base
+      address and length of I2S controller. The second one is for physical
+      base address and length of DMA_BDL controller.
+
+  interrupts:
+    description: |
+      The interrupt line number for the I2S controller. It should contain
+      the DMA_BDL interrupt.
+    maxItems: 1
+
+  clocks:
+    description: Sampling rate reference clock
+    maxItems: 1
+
+  dai-name:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: it will set dai's name used in driver.
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - dai-name
+
+examples:
+  - |
+    i2s@28009000 {
+      compatible = "phytium,i2s";
+      reg = <0x0 0x28009000 0x0 0x1000>, <0x0 0x28005000 0x0 0x1000>;
+      interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+      clocks = <&sysclk_600mhz>;
+      dai-name = "phytium-i2s-lsd";
+    };
