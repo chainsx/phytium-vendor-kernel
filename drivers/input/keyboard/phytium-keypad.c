@@ -2,7 +2,7 @@
 /*
  * Driver for the Phytium keypad port.
  *
- * Copyright (c) 2020-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2020-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/delay.h>

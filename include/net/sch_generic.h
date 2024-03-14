@@ -195,7 +195,7 @@ nolock_empty:
 		 * Variant of write_seqcount_t_begin() telling lockdep that a
 		 * trylock was attempted.
 		 */
-		raw_write_seqcount_t_begin(s);
+		do_raw_write_seqcount_begin(s);
 		seqcount_acquire(&s->dep_map, 0, 1, _RET_IP_);
 		return true;
 	}
@@ -1343,9 +1343,11 @@ void mini_qdisc_pair_init(struct mini_Qdisc_pair *miniqp, struct Qdisc *qdisc,
 void mini_qdisc_pair_block_init(struct mini_Qdisc_pair *miniqp,
 				struct tcf_block *block);
 
-static inline int skb_tc_reinsert(struct sk_buff *skb, struct tcf_result *res)
+/* Make sure qdisc is no longer in SCHED state. */
+static inline void qdisc_synchronize(const struct Qdisc *q)
 {
-	return res->ingress ? netif_receive_skb(skb) : dev_queue_xmit(skb);
+	while (test_bit(__QDISC_STATE_SCHED, &q->state))
+		msleep(1);
 }
 
 #endif
