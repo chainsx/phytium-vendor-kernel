@@ -2,7 +2,7 @@
 /*
  * Implementation of primary ALSA driver code for Phytium HD Audio.
  *
- * Copyright (c) 2018-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2018-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/delay.h>

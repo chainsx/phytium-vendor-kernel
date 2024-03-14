@@ -44,6 +44,7 @@ int acpi_register_irq(struct device *dev, u32 hwirq, int trigger,
 		      int polarity, struct fwnode_handle *fwnode)
 {
 	struct irq_fwspec fwspec;
+	unsigned int irq;
 
 	if (!fwnode) {
 		dev_warn(dev, "No registered irqchip for hwirq %d\n", hwirq);
@@ -55,7 +56,11 @@ int acpi_register_irq(struct device *dev, u32 hwirq, int trigger,
 	fwspec.param[1] = acpi_dev_get_irq_type(trigger, polarity);
 	fwspec.param_count = 2;
 
-	return irq_create_fwspec_mapping(&fwspec);
+	irq = irq_create_fwspec_mapping(&fwspec);
+	if (!irq)
+		return -EINVAL;
+
+	return irq;
 }
 
 /**

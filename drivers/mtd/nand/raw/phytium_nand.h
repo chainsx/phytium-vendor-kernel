@@ -2,7 +2,7 @@
 /*
  * Phytium NAND flash controller driver
  *
- * Copyright (c) 2020-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2020-2024 Phytium Technology Co., Ltd.
  */
 #ifndef PHYTIUM_NAND_H
 #define PHYTIUM_NAND_H

@@ -1,7 +1,7 @@
 /*
  * Homogeneous Remote Processor Control Driver
  *
- * Copyright (c) 2022-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  * Author: Shaojun Yang <yangshaojun@phytium.com.cn>
  *
  * This program is free software; you can redistribute it and/or modify it under the terms
