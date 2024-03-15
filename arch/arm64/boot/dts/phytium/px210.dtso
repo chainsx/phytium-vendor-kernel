@@ -1,0 +1,30 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "phytium,pe220x";
+
+        fragment@0 {
+                target = <&soc>;
+                __overlay__ {
+			dc0:dc@32000000 {
+				 status = "disabled";
+			 };
+			pmdk_dp {
+				 num-dp = <3>;
+           			 dp-mask = [07];
+       			 };
+		};
+        };
+
+
+
+	 fragment@1 {
+		target-path = "/iommu@30000000";
+		 __overlay__ {
+			status = "disabled";
+  		 };
+        };
+
+
+};
