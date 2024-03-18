@@ -15,3 +15,6 @@ dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-power-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-hanwei-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += phytiumpi_firefly.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-chillipi-edu-board.dtb
+
+#Enable support for device-tree overlay
+DTC_FLAGS += -@
