@@ -95,6 +95,7 @@ static void phytium_mci_update_external_clk(struct phytium_mci_host *host, u32 u
 	writel(uhs_reg_value, host->base + MCI_UHS_REG_EXT);
 	while (!(readl(host->base + MCI_CCLK_RDY) & 0x1))
 		cpu_relax();
+
 }
 
 static void phytium_mci_prepare_data(struct phytium_mci_host *host,
@@ -1155,27 +1156,15 @@ static irqreturn_t phytium_mci_irq(int irq, void *dev_id)
 	cmd = host->cmd;
 	data = host->data;
 
-#if 0
-	if (((events & event_mask) & MCI_RAW_INTS_SDIO) &&
-	    ((events == 0x10001) || (events == 0x10000) || (events == 0x10040))) {
-		writel(events, host->base + MCI_RAW_INTS);
+	if ((events & event_mask) & MCI_RAW_INTS_SDIO)
 		__phytium_mci_enable_sdio_irq(host, 0);
-		sdio_signal_irq(host->mmc);
-		spin_unlock_irqrestore(&host->lock, flags);
-		goto irq_out;
-	}
-#endif
-	if ((events & event_mask) & MCI_RAW_INTS_SDIO) {
-		__phytium_mci_enable_sdio_irq(host, 0);
-	}
 
 	writel((events & event_mask), host->base + MCI_RAW_INTS);
 	writel(dmac_events, host->base + MCI_DMAC_STATUS);
 	spin_unlock_irqrestore(&host->lock, flags);
 
-	if ((events & event_mask) & MCI_RAW_INTS_SDIO) {
+	if ((events & event_mask) & MCI_RAW_INTS_SDIO)
 		sdio_signal_irq(host->mmc);
-	}
 
 	if (((events & event_mask) == 0) && ((dmac_evt_mask & dmac_events) == 0))
 		goto irq_out;
