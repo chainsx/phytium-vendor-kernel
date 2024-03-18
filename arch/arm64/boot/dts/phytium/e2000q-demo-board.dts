@@ -239,3 +239,7 @@
 &rng0 {
 	status = "okay";
 };
+
+&vpu0 {
+    status = "okay";
+};
