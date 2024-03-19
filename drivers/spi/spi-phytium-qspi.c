@@ -2,14 +2,13 @@
 /*
  * Phytium Quad SPI controller driver.
  *
- * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2023, Phytium Technology Co., Ltd.
  */
 
 #include <linux/clk.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -290,8 +289,6 @@ static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
 		struct phytium_qspi_flash *flash)
 {
 	u32 cmd = 0;
-	u32 state = 0;
-	int ret = 0;
 
 	cmd |= 0x05 << QSPI_CMD_PORT_CMD_SHIFT;
 	cmd |= BIT(QSPI_CMD_PORT_TRANSFER_SHIFT);
@@ -300,13 +297,8 @@ static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
 	writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
 	readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
 
-	ret = readl_poll_timeout(qspi->io_base + QSPI_LD_PORT_REG,
-				 state, !(state & 0x01), 10, 100000);
-	if (ret)
-		dev_err(qspi->dev, "wait device timeout\n");
-
 	/* clear wr_cfg */
-	writel_relaxed(0x0, qspi->io_base + QSPI_WR_CFG_REG);
+	writel_relaxed(0, qspi->io_base + QSPI_WR_CFG_REG);
 }
 
 static int phytium_qspi_write_port(struct phytium_qspi *qspi,
