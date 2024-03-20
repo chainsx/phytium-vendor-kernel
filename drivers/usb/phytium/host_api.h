@@ -10,6 +10,7 @@
 #define MAX_SUPPORTED_DEVICES 16
 #define USB_PORT_STAT_RESUME (1 << 31)
 #define MAX_INSTANCE_EP_NUM 6
+#define ENDPOINT_DIR 2
 
 enum HOST_OtgState {
 	HOST_OTG_STATE_A_IDLE,
@@ -63,6 +64,7 @@ struct HOST_EP {
 	struct list_head reqList;
 	void *userExt;
 	uint8_t *hcPriv;
+	uint8_t device_epNum;
 };
 
 struct HOST_USB_DEVICE {
@@ -241,6 +243,7 @@ struct HOST_CTRL {
 	struct HOST_USB_DEVICE *host_devices_table[MAX_SUPPORTED_DEVICES];
 	struct CUSTOM_REGS *custom_regs;
 	struct VHUB_REGS *vhub_regs;
+	int ep_remap_pool[ENDPOINT_DIR][MAX_INSTANCE_EP_NUM + 1];
 };
 
 struct HOST_OBJ *HOST_GetInstance(void);
