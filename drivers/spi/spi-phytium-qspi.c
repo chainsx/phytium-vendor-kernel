@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -168,6 +169,10 @@ struct phytium_qspi {
 	struct phytium_qspi_flash flash[PHYTIUM_QSPI_MAX_NORCHIP];
 	u8 fnum;
 	bool nodirmap;
+
+	u32 wr_cfg_reg;
+	u32 rd_cfg_reg;
+	u32 flash_cap;
 };
 
 static bool phytium_qspi_check_buswidth(u8 width)
@@ -279,6 +284,29 @@ static int phytium_qspi_flash_capacity_encode(u32 size, u32 *cap)
 	}
 
 	return ret;
+}
+
+static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
+		struct phytium_qspi_flash *flash)
+{
+	u32 cmd = 0;
+	u32 state = 0;
+	int ret = 0;
+
+	cmd |= 0x05 << QSPI_CMD_PORT_CMD_SHIFT;
+	cmd |= BIT(QSPI_CMD_PORT_TRANSFER_SHIFT);
+	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
+
+	writeb_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
+	readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
+
+	ret = readl_poll_timeout(qspi->io_base + QSPI_LD_PORT_REG,
+				state, !(state & 0x01), 10, 100000);
+	if (ret)
+		dev_err(qspi->dev, "wait device timeout\n");
+
+	/* clear wr_cfg */
+	writeb_relaxed(0x0, qspi->io_base + QSPI_WR_CFG_REG);
 }
 
 static int phytium_qspi_write_port(struct phytium_qspi *qspi,
@@ -468,6 +496,7 @@ static int phytium_qspi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 		cmd |= flash->clk_div & QSPI_RD_CFG_RD_SCK_SEL_MASK;
 
 		writel_relaxed(cmd, qspi->io_base + QSPI_RD_CFG_REG);
+		qspi->rd_cfg_reg = cmd;
 
 		dev_dbg(qspi->dev, "Create read dirmap and setup RD_CFG_REG [%#x].\n", cmd);
 	} else if (desc->info.op_tmpl.data.dir == SPI_MEM_DATA_OUT) {
@@ -484,10 +513,7 @@ static int phytium_qspi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 
 		cmd |= QSPI_WR_CFG_WR_MODE_MASK;
 		cmd |= flash->clk_div & QSPI_WR_CFG_WR_SCK_SEL_MASK;
-
-		writel_relaxed(cmd, qspi->io_base + QSPI_WR_CFG_REG);
-
-		dev_dbg(qspi->dev, "Create write dirmap and setup WR_CFG_REG [%#x].\n", cmd);
+		qspi->wr_cfg_reg = cmd;
 	} else {
 		ret = -EINVAL;
 	}
@@ -524,6 +550,9 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 	size_t mask = 0x03;
 	u_char tmp[4] = {0};
 
+	/* set wr_cfg for drimap write */
+	writel_relaxed(qspi->wr_cfg_reg, qspi->io_base + QSPI_WR_CFG_REG);
+
 	if (offs & 0x03) {
 		dev_err(qspi->dev, "Addr not four-byte aligned!\n");
 		return -EINVAL;
@@ -540,6 +569,8 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 
 	//write cache data to flash
 	writel_relaxed(QSPI_FLUSH_EN, qspi->io_base + QSPI_FLUSH_REG);
+
+	phytium_qspi_clear_wr(qspi, flash);
 
 	return len;
 }
@@ -614,7 +645,6 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct phytium_qspi *qspi;
 	int i, ret;
-	u32 flash_cap;
 	struct spi_mem *mem;
 	struct spi_nor *nor;
 
@@ -719,15 +749,15 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 		}
 
 		ret = phytium_qspi_flash_capacity_encode(qspi->flash[0].size,
-							 &flash_cap);
+							 &qspi->flash_cap);
 		if (ret) {
 			dev_err(dev, "Flash size is invalid.\n");
 			goto probe_setup_failed;
 		}
 
-		flash_cap |= qspi->fnum << QSPI_FLASH_CAP_NUM_SHIFT;
+		qspi->flash_cap |= qspi->fnum << QSPI_FLASH_CAP_NUM_SHIFT;
 
-		writel_relaxed(flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
+		writel_relaxed(qspi->flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
 	}
 
 	return 0;
@@ -771,6 +801,11 @@ static int __maybe_unused phytium_qspi_suspend(struct device *dev)
 
 static int __maybe_unused phytium_qspi_resume(struct device *dev)
 {
+	struct phytium_qspi *qspi = dev_get_drvdata(dev);
+
+	/* set rd_cfg reg and flash_capacity reg after resume */
+	writel_relaxed(qspi->rd_cfg_reg, qspi->io_base + QSPI_RD_CFG_REG);
+	writel_relaxed(qspi->flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
 	return pm_runtime_force_resume(dev);
 }
 
