@@ -21,3 +21,8 @@ dtbo-$(CONFIG_ARCH_PHYTIUM) += usb2_host_for_pe220x.dtbo
 
 #Enable support for device-tree overlay
 DTC_FLAGS += -@
+
+targets += dtbs dtbs_install
+targets += $(dtbo-y)
+
+always-y := $(dtbo-y)
