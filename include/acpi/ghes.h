@@ -130,6 +130,12 @@ int ghes_notify_sea(void);
 static inline int ghes_notify_sea(void) { return -ENOENT; }
 #endif
 
+#ifdef CONFIG_ACPI_APEI_SEI
+int ghes_notify_sei(void);
+#else
+static inline int ghes_notify_sei(void) { return -ENOENT; }
+#endif
+
 struct ghes_mem_err {
 	int notify_type;
 	int severity;

@@ -49,6 +49,8 @@
 #include <asm/system_misc.h>
 #include <asm/sysreg.h>
 
+#include <acpi/ghes.h>
+
 static bool __kprobes __check_eq(unsigned long pstate)
 {
 	return (pstate & PSR_Z_BIT) != 0;
@@ -968,6 +970,13 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, unsigned long esr)
 bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned long esr)
 {
 	unsigned long aet = arm64_ras_serror_get_severity(esr);
+	int ret = ENOENT;
+
+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
+		ret = ghes_notify_sei();
+		if (!ret)
+			return false;
+	}
 
 	switch (aet) {
 	case ESR_ELx_AET_CE:	/* corrected error */
