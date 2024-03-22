@@ -17475,6 +17475,7 @@ F:	drivers/mtd/nand/raw/phytium_nand*
 F:	drivers/net/can/phytium/*
 F:	drivers/net/ethernet/stmicro/stmmac/dwmac-phytium.c
 F:	drivers/pci/controller/pcie-phytium*
+F:	drivers/perf/phytium/*
 F:	drivers/pwm/pwm-phytium.c
 F:	drivers/spi/spi-phytium*
 F:	drivers/spi/spi-phytium-dma.c
