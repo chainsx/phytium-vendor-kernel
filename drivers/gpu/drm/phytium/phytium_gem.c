@@ -172,12 +172,6 @@ void phytium_gem_prime_vunmap(struct drm_gem_object *obj, struct iosys_map *map)
 
 int phytium_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
-	int ret = 0;
-
-	ret = drm_gem_mmap_obj(obj, obj->size, vma);
-	if (ret < 0)
-		return ret;
-
 	return phytium_gem_mmap_obj(obj, vma);
 }
 
@@ -392,10 +386,7 @@ int phytium_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	int ret = 0;
 
 	ret = drm_gem_mmap(filp, vma);
-	if (ret < 0)
-		return ret;
-
-	return phytium_gem_mmap_obj(vma->vm_private_data, vma);
+	return ret;
 }
 
 static const struct vm_operations_struct phytium_vm_ops = {
@@ -409,6 +400,7 @@ static const struct drm_gem_object_funcs phytium_drm_gem_object_funcs = {
 	.vmap = phytium_gem_prime_vmap,
 	.vunmap = phytium_gem_prime_vunmap,
 	.vm_ops = &phytium_vm_ops,
+	.mmap = phytium_gem_prime_mmap,
 };
 
 struct phytium_gem_object *phytium_gem_create_object(struct drm_device *dev, unsigned long size)

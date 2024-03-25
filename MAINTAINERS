@@ -17456,6 +17456,7 @@ F:	drivers/dma/phytium/phytium-ddmac.c
 F:	drivers/edac/phytium_edac.c
 F:	drivers/gpio/gpio-phytium*
 F:	drivers/gpio/gpio-phytium-sgpio.c
+F:	drivers/gpu/drm/phytium/*
 F:	drivers/hwspinlock/phytium_hwspinlock.c
 F:	drivers/i2c/busses/i2c-phytium-*
 F:	drivers/iio/adc/phytium-adc.c

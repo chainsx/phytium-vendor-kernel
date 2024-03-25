@@ -7,6 +7,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/display/drm_dp.h>
+#include <drm/display/drm_dp_helper.h>
 #include <drm/drm_encoder.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_modes.h>
@@ -299,7 +300,7 @@ static int phytium_connector_add_common_modes(struct phytium_dp_device *phytium_
 		mode->hdisplay = common_mode[i].w;
 		mode->vdisplay = common_mode[i].h;
 		mode->type &= ~DRM_MODE_TYPE_PREFERRED;
-		strncpy(mode->name, common_mode[i].name, DRM_DISPLAY_MODE_LEN);
+		strscpy(mode->name, common_mode[i].name, DRM_DISPLAY_MODE_LEN);
 		drm_mode_probed_add(&phytium_dp->connector, mode);
 		ret++;
 	}
@@ -1105,7 +1106,6 @@ static int phytium_dp_dpcd_set_link(struct phytium_dp_device *phytium_dp,
 	link_config[1] = lane_count;
 	if (drm_dp_enhanced_frame_cap(phytium_dp->dpcd))
 		link_config[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
-
 	ret = drm_dp_dpcd_write(&phytium_dp->aux, DP_LINK_BW_SET, link_config, 2);
 	if (ret < 0) {
 		DRM_NOTE("write dpcd DP_LINK_BW_SET fail: ret:%d\n", ret);

@@ -37,7 +37,6 @@ int phytium_gem_dumb_destroy(struct drm_file *file, struct drm_device *dev, unsi
 struct phytium_gem_object *phytium_gem_create_object(struct drm_device *dev, unsigned long size);
 int phytium_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 				     struct drm_mode_create_dumb *args);
-int phytium_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);
 int phytium_gem_suspend(struct drm_device *drm_dev);
 void phytium_gem_resume(struct drm_device *drm_dev);
 #endif /* __PHYTIUM_GEM_H__ */

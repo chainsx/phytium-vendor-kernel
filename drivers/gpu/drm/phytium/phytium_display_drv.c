@@ -253,8 +253,8 @@ static int phytium_display_load(struct drm_device *dev, unsigned long flags)
 		priv->vram_hw_init(priv);
 
 	phytium_irq_preinstall(dev);
-	ret = request_irq(priv->irq, phytium_display_irq_handler,
-			  IRQF_SHARED, dev->driver->name, dev);
+	ret = request_irq(priv->irq, phytium_display_irq_handler, IRQF_SHARED,
+			  dev->driver->name, dev);
 	if (ret) {
 		DRM_ERROR("install irq failed\n");
 		goto failed_irq_install;

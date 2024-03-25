@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0-only
-
 phytium-dc-drm-y := phytium_display_drv.o \
 		    phytium_plane.o \
 		    phytium_crtc.o \
