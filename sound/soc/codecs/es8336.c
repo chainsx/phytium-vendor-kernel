@@ -953,6 +953,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c)
 	struct es8336_priv *es8336;
 	int ret = -1;
 	int hp_irq;
+	int active_level = 0;
 
 	es8336 = devm_kzalloc(&i2c->dev, sizeof(*es8336), GFP_KERNEL);
 	if (!es8336)
@@ -974,6 +975,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c)
 
 	es8336->spk_ctl_gpio = devm_gpiod_get_index_optional(&i2c->dev, "sel", 0,
 							GPIOD_OUT_HIGH);
+	device_property_read_u32(&i2c->dev, "spk-active-level", &active_level);
 	ret = of_property_read_u8(i2c->dev.of_node, "mic-src", &es8336->mic_src);
 	if (ret != 0) {
 		dev_dbg(&i2c->dev, "mic1-src return %d", ret);
@@ -984,7 +986,7 @@ static int es8336_i2c_probe(struct i2c_client *i2c)
 	if (IS_ERR_OR_NULL(es8336->spk_ctl_gpio))
 		dev_info(&i2c->dev, "Can not get spk_ctl_gpio\n");
 	else {
-		es8336->spk_active_level = 0;
+		es8336->spk_active_level = active_level;
 		es8336_enable_spk(es8336, false);
 	}
 
