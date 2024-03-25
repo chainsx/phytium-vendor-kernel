@@ -108,6 +108,35 @@ phytium_plane_atomic_destroy_state(struct drm_plane *plane, struct drm_plane_sta
 	kfree(phytium_state);
 }
 
+static bool phytium_plane_format_mod_supported(struct drm_plane *plane,
+						uint32_t format, uint64_t modifier)
+{
+	if (modifier == DRM_FORMAT_MOD_LINEAR)
+		return true;
+
+	if (modifier == DRM_FORMAT_MOD_PHYTIUM_TILE_MODE3_FBCDC) {
+		switch (format) {
+		case DRM_FORMAT_ARGB2101010:
+		case DRM_FORMAT_ABGR2101010:
+		case DRM_FORMAT_RGBA1010102:
+		case DRM_FORMAT_BGRA1010102:
+		case DRM_FORMAT_ARGB8888:
+		case DRM_FORMAT_ABGR8888:
+		case DRM_FORMAT_RGBA8888:
+		case DRM_FORMAT_BGRA8888:
+		case DRM_FORMAT_XRGB8888:
+		case DRM_FORMAT_XBGR8888:
+		case DRM_FORMAT_RGBX8888:
+		case DRM_FORMAT_BGRX8888:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	return false;
+}
+
 const struct drm_plane_funcs phytium_plane_funcs = {
 	.update_plane		= drm_atomic_helper_update_plane,
 	.disable_plane		= drm_atomic_helper_disable_plane,
@@ -117,6 +146,7 @@ const struct drm_plane_funcs phytium_plane_funcs = {
 	.atomic_set_property	= phytium_plane_atomic_set_property,
 	.atomic_duplicate_state	= phytium_plane_atomic_duplicate_state,
 	.atomic_destroy_state	= phytium_plane_atomic_destroy_state,
+	.format_mod_supported	= phytium_plane_format_mod_supported,
 };
 
 static int
