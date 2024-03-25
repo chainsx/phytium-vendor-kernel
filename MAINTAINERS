@@ -17423,6 +17423,7 @@ F:	Documentation/devicetree/bindings/dma/phytium-ddma.yaml
 F:	Documentation/devicetree/bindings/edac/phytium-pe220x-edac.txt
 F:	Documentation/devicetree/bindings/gpio/phytium,gpio.yaml
 F:	Documentation/devicetree/bindings/gpio/phytium,sgpio.yaml
+F:	Documentation/devicetree/bindings/gpu/phytium,dc.yaml
 F:	drivers/hwmon/tacho-phytium.c
 F:	Documentation/devicetree/bindings/hwlock/phytium,hwspinlock.yaml
 F:	Documentation/devicetree/bindings/hwmon/phytium,tacho.yaml
