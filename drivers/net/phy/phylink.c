@@ -3739,6 +3739,11 @@ static int __init phylink_init(void)
 	return 0;
 }
 
+static void __exit phylink_exit(void)
+{
+}
+
 module_init(phylink_init);
+module_exit(phylink_exit);
 
 MODULE_LICENSE("GPL v2");
