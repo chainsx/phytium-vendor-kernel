@@ -421,9 +421,14 @@ static const struct snd_soc_dapm_route es8388_dapm_routes[] = {
 
 static int es8388_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
-	return snd_soc_component_update_bits(dai->component, ES8388_DACCONTROL3,
-			ES8388_DACCONTROL3_DACMUTE,
-			mute ? ES8388_DACCONTROL3_DACMUTE : 0);
+	if (direction)
+		return snd_soc_component_update_bits(dai->component, ES8388_ADCCONTROL7,
+				ES8388_ADCCONTROL7_ADC_MUTE,
+				mute ? ES8388_ADCCONTROL7_ADC_MUTE : 0);
+	else
+		return snd_soc_component_update_bits(dai->component, ES8388_DACCONTROL3,
+				ES8388_DACCONTROL3_DACMUTE,
+				mute ? ES8388_DACCONTROL3_DACMUTE : 0);
 }
 
 static int es8388_startup(struct snd_pcm_substream *substream,
