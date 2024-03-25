@@ -306,7 +306,7 @@ struct i2s_phytium {
 	u32 xfer_resolution;
 	u32 ccr;
 	u32 clk_base;
-
+	u32 cfg;
 	struct i2s_clk_config_data config;
 
 	/*azx_dev*/

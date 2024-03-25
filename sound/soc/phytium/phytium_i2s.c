@@ -270,6 +270,7 @@ static int phytium_i2s_hw_params(struct snd_pcm_substream *substream,
 		i2s_write_reg(dev->regs, CLK_CFG0, cfg);
 		i2s_write_reg(dev->regs, CLK_CFG1, 0xf);
 	}
+	dev->cfg = cfg;
 	return 0;
 }
 
@@ -367,7 +368,8 @@ static int phytium_i2s_resume(struct snd_soc_component *component)
 		if (snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_CAPTURE))
 			phytium_i2s_config(dev, SNDRV_PCM_STREAM_CAPTURE);
 	}
-
+	i2s_write_reg(dev->regs, CLK_CFG0, dev->cfg);
+	i2s_write_reg(dev->regs, CLK_CFG1, 0xf);
 	return 0;
 }
 #else
