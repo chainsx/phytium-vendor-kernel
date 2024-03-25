@@ -11,7 +11,7 @@
 #include <linux/scatterlist.h>
 #include <linux/gpio.h>
 
-#define CTRL0			0x00
+#define CTRLR0			0x00
 #define SSIENR			0x08
 #define SER			0x10
 #define BAUDR			0x14
@@ -42,7 +42,6 @@
 #define INT_TXOI		(1 << 1)
 #define INT_RXUI		(1 << 2)
 #define INT_RXOI		(1 << 3)
-
 /* Bit fields in SR, 7 bits */
 #define SR_MASK			0x7f		/* cover 7 bits */
 #define SR_BUSY			(1 << 0)
@@ -52,15 +51,11 @@
 #define SR_RF_FULL		(1 << 4)
 #define SR_TX_ERR		(1 << 5)
 #define SR_DCOL			(1 << 6)
-
 /* Bit fields in DMACR */
 #define SPI_DMA_RDMAE		(1 << 0)
 #define SPI_DMA_TDMAE		(1 << 1)
-
 #define SPI_WAIT_RETRIES	5
-
 struct phytium_spi;
-
 struct phytium_spi_dma_ops {
 	int (*dma_init)(struct device *dev, struct phytium_spi *fts);
 	void (*dma_exit)(struct phytium_spi *fts);
@@ -95,9 +90,8 @@ struct phytium_spi {
 	void			*rx_end;
 	u8			n_bytes;
 	int			dma_mapped;
-	struct clk		*clk;
 	irqreturn_t		(*transfer_handler)(struct phytium_spi *fts);
-
+	/* DMA info */
 	u32			current_freq; /* frequency in hz */
 	struct dma_chan		*txchan;
 	u32			txburst;
@@ -105,7 +99,7 @@ struct phytium_spi {
 	u32			rxburst;
 	u32			dma_sg_burst;
 	unsigned long		dma_chan_busy;
-	dma_addr_t		dma_addr;
+	dma_addr_t		dma_addr; /* phy address of the Data register */
 	const struct phytium_spi_dma_ops *dma_ops;
 	struct completion	dma_completion;
 };
@@ -114,22 +108,18 @@ static inline u32 phytium_readl(struct phytium_spi *fts, u32 offset)
 {
 	return __raw_readl(fts->regs + offset);
 }
-
 static inline u16 phytium_readw(struct phytium_spi *fts, u32 offset)
 {
 	return __raw_readw(fts->regs + offset);
 }
-
 static inline void phytium_writel(struct phytium_spi *fts, u32 offset, u32 val)
 {
 	__raw_writel(val, fts->regs + offset);
 }
-
 static inline void phytium_writew(struct phytium_spi *fts, u32 offset, u16 val)
 {
 	__raw_writew(val, fts->regs + offset);
 }
-
 static inline u32 phytium_read_io_reg(struct phytium_spi *fts, u32 offset)
 {
 	switch (fts->reg_io_width) {
@@ -140,8 +130,8 @@ static inline u32 phytium_read_io_reg(struct phytium_spi *fts, u32 offset)
 		return phytium_readl(fts, offset);
 	}
 }
-
-static inline void phytium_write_io_reg(struct phytium_spi *fts, u32 offset, u32 val)
+static inline void phytium_write_io_reg(struct phytium_spi *fts,
+				u32 offset, u32 val)
 {
 	switch (fts->reg_io_width) {
 	case 2:
@@ -153,17 +143,14 @@ static inline void phytium_write_io_reg(struct phytium_spi *fts, u32 offset, u32
 		break;
 	}
 }
-
 static inline void spi_enable_chip(struct phytium_spi *fts, int enable)
 {
 	phytium_writel(fts, SSIENR, (enable ? 1 : 0));
 }
-
 static inline void spi_set_clk(struct phytium_spi *fts, u16 div)
 {
 	phytium_writel(fts, BAUDR, div);
 }
-
 static inline void spi_mask_intr(struct phytium_spi *fts, u32 mask)
 {
 	u32 new_mask;
@@ -171,7 +158,6 @@ static inline void spi_mask_intr(struct phytium_spi *fts, u32 mask)
 	new_mask = phytium_readl(fts, IMR) & ~mask;
 	phytium_writel(fts, IMR, new_mask);
 }
-
 static inline void spi_umask_intr(struct phytium_spi *fts, u32 mask)
 {
 	u32 new_mask;
@@ -179,17 +165,15 @@ static inline void spi_umask_intr(struct phytium_spi *fts, u32 mask)
 	new_mask = phytium_readl(fts, IMR) | mask;
 	phytium_writel(fts, IMR, new_mask);
 }
-
 static inline void spi_global_cs(struct phytium_spi *fts)
 {
 	u32 global_cs_en, mask, setmask;
 
 	mask = GENMASK(fts->num_cs-1, 0) << fts->num_cs;
 	setmask = ~GENMASK(fts->num_cs-1, 0);
-	global_cs_en = (phytium_readl(fts, GCSR) | mask) & setmask;
+	global_cs_en =	(phytium_readl(fts, GCSR) | mask) & setmask;
 	phytium_writel(fts, GCSR, global_cs_en);
 }
-
 static inline void spi_reset_chip(struct phytium_spi *fts)
 {
 	spi_enable_chip(fts, 0);
@@ -198,19 +182,16 @@ static inline void spi_reset_chip(struct phytium_spi *fts)
 	spi_mask_intr(fts, 0xff);
 	spi_enable_chip(fts, 1);
 }
-
 static inline void spi_shutdown_chip(struct phytium_spi *fts)
 {
 	spi_enable_chip(fts, 0);
 	spi_set_clk(fts, 0);
 	fts->current_freq = 0;
 }
-
 extern int phytium_spi_add_host(struct device *dev, struct phytium_spi *fts);
 extern void phytium_spi_remove_host(struct phytium_spi *fts);
 extern int phytium_spi_suspend_host(struct phytium_spi *fts);
 extern int phytium_spi_resume_host(struct phytium_spi *fts);
 extern void phytium_spi_dmaops_set(struct phytium_spi *fts);
 extern int phytium_spi_check_status(struct phytium_spi *fts, bool raw);
-
 #endif /* PHYTIUM_SPI_HEADER_H */

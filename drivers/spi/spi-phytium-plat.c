@@ -88,16 +88,16 @@ static int phytium_spi_probe(struct platform_device *pdev)
 	device_property_read_u32(&pdev->dev, "reg-io-width", &fts->reg_io_width);
 
 	num_cs = 4;
-
 	device_property_read_u32(&pdev->dev, "num-cs", &num_cs);
-
 	fts->num_cs = num_cs;
 
 	device_property_read_u32(&pdev->dev, "global-cs", &global_cs);
 	fts->global_cs = global_cs;
 
-	if ((device_property_read_string_array(&pdev->dev, "dma-names", NULL, 0) > 0) &&
-	    device_property_present(&pdev->dev, "dmas")) {
+	/* check is use dma transfer */
+	if ((device_property_read_string_array(&pdev->dev, "dma-names",
+			NULL, 0) > 0) &&
+		device_property_present(&pdev->dev, "dmas")) {
 		fts->dma_en = true;
 		phytium_spi_dmaops_set(fts);
 	}

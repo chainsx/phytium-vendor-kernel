@@ -88,14 +88,16 @@ static void phytium_spi_pci_remove(struct pci_dev *pdev)
 #ifdef CONFIG_PM_SLEEP
 static int spi_suspend(struct device *dev)
 {
-	struct phytium_spi *fts = dev_get_drvdata(dev);
+	struct spi_master *master = dev_get_drvdata(dev);
+	struct phytium_spi *fts = spi_master_get_devdata(master);
 
 	return phytium_spi_suspend_host(fts);
 }
 
 static int spi_resume(struct device *dev)
 {
-	struct phytium_spi *fts = dev_get_drvdata(dev);
+	struct spi_master *master = dev_get_drvdata(dev);
+	struct phytium_spi *fts = spi_master_get_devdata(master);
 
 	return phytium_spi_resume_host(fts);
 }

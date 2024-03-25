@@ -46,13 +46,24 @@ static void phytium_spi_dma_maxburst_init(struct phytium_spi *fts)
 	else
 		max_burst = TX_BURST_LEVEL;
 
+	/*
+	 * Having a Rx DMA channel serviced with higher priority than a Tx DMA
+	 * channel might not be enough to provide a well balanced DMA-based
+	 * SPI transfer interface. There might still be moments when the Tx DMA
+	 * channel is occasionally handled faster than the Rx DMA channel.
+	 * That in its turn will eventually cause the SPI Rx FIFO overflow if
+	 * SPI bus speed is high enough to fill the SPI Rx FIFO in before it's
+	 * cleared by the Rx DMA channel. In order to fix the problem the Tx
+	 * DMA activity is intentionally slowed down by limiting the SPI Tx
+	 * FIFO depth with a value twice bigger than the Tx burst length.
+	 */
 	fts->txburst = min(max_burst, def_burst);
 	/* set dmatdlr to 0 + 1 */
 	phytium_writel(fts, DMATDLR, 0);
 }
 
 static int phytium_spi_dma_init(struct device *dev,
-				struct phytium_spi *fts)
+		struct phytium_spi *fts)
 {
 	fts->rxchan = dma_request_chan(dev, "rx");
 	if (IS_ERR_OR_NULL(fts->rxchan))
@@ -89,8 +100,8 @@ static void phytium_spi_dma_exit(struct phytium_spi *fts)
 	}
 }
 
-static irqreturn_t
-phytium_spi_dma_transfer_handler(struct phytium_spi *fts)
+static irqreturn_t phytium_spi_dma_transfer_handler
+(struct phytium_spi *fts)
 {
 	phytium_spi_check_status(fts, false);
 
@@ -100,7 +111,7 @@ phytium_spi_dma_transfer_handler(struct phytium_spi *fts)
 }
 
 static bool phytium_spi_can_dma(struct spi_controller *master,
-				struct spi_device *spi, struct spi_transfer *xfer)
+			   struct spi_device *spi, struct spi_transfer *xfer)
 {
 	struct phytium_spi *fts = spi_controller_get_devdata(master);
 
@@ -118,7 +129,7 @@ static enum dma_slave_buswidth phytium_spi_dma_convert_width(u8 n_bytes)
 }
 
 static int phytium_spi_dma_wait(struct phytium_spi *fts, unsigned int len,
-				u32 speed)
+					u32 speed)
 {
 	unsigned long long ms;
 
@@ -150,7 +161,6 @@ static void spi_transfer_delay_ns(u32 ns)
 {
 	if (!ns)
 		return;
-
 	if (ns <= 1000) {
 		ndelay(ns);
 	} else {
@@ -164,7 +174,7 @@ static void spi_transfer_delay_ns(u32 ns)
 }
 
 static int phytium_spi_dma_wait_tx_done(struct phytium_spi *fts,
-					struct spi_transfer *xfer)
+				   struct spi_transfer *xfer)
 {
 	int retry = SPI_WAIT_RETRIES;
 	u32 ns = 0;
@@ -185,6 +195,11 @@ static int phytium_spi_dma_wait_tx_done(struct phytium_spi *fts,
 	return 0;
 }
 
+/*
+ * fts->dma_chan_busy is set before the dma transfer starts,
+ * callback for tx
+ * channel will clear a corresponding bit.
+ */
 static void phytium_spi_dma_tx_done(void *arg)
 {
 	struct phytium_spi *fts = arg;
@@ -212,7 +227,7 @@ static int phytium_spi_dma_config_tx(struct phytium_spi *fts)
 }
 
 static int phytium_spi_dma_submit_tx(struct phytium_spi *fts,
-				     struct scatterlist *sgl, unsigned int nents)
+	struct scatterlist *sgl, unsigned int nents)
 {
 	struct dma_async_tx_descriptor *txdesc;
 	dma_cookie_t cookie;
@@ -250,6 +265,15 @@ static int phytium_spi_dma_wait_rx_done(struct phytium_spi *fts)
 	unsigned long ns = 0;
 	u32 nents = 0;
 
+	/*
+	 * It's unlikely that DMA engine is still doing the data fetching, but
+	 * if it's let's give it some reasonable time. The timeout calculation
+	 * is based on the synchronous APB/SSI reference clock rate, on a
+	 * number of data entries left in the Rx FIFO, times a number of clock
+	 * periods normally needed for a single APB read/write transaction
+	 * without PREADY signal utilized (which is true for the phytium APB SSI
+	 * controller).
+	 */
 	nents = phytium_readl(fts, RXFLR);
 	ns = 4U * NSEC_PER_SEC / fts->max_freq * nents;
 
@@ -264,6 +288,11 @@ static int phytium_spi_dma_wait_rx_done(struct phytium_spi *fts)
 	return 0;
 }
 
+/*
+ * fts->dma_chan_busy is set before the dma transfer starts,
+ * callback for rx
+ * channel will clear a corresponding bit.
+ */
 static void phytium_spi_dma_rx_done(void *arg)
 {
 	struct phytium_spi *fts = arg;
@@ -291,7 +320,7 @@ static int phytium_spi_dma_config_rx(struct phytium_spi *fts)
 }
 
 static int phytium_spi_dma_submit_rx(struct phytium_spi *fts,
-				     struct scatterlist *sgl, unsigned int nents)
+	struct scatterlist *sgl, unsigned int nents)
 {
 	struct dma_async_tx_descriptor *rxdesc;
 	dma_cookie_t cookie;
@@ -319,7 +348,7 @@ static int phytium_spi_dma_submit_rx(struct phytium_spi *fts,
 }
 
 static int phytium_spi_dma_setup(struct phytium_spi *fts,
-				 struct spi_transfer *xfer)
+		struct spi_transfer *xfer)
 {
 	u16 imr, dma_ctrl;
 	int ret;
@@ -359,7 +388,7 @@ static int phytium_spi_dma_setup(struct phytium_spi *fts,
 }
 
 static int phytium_spi_dma_transfer_all(struct phytium_spi *fts,
-					struct spi_transfer *xfer)
+				   struct spi_transfer *xfer)
 {
 	int ret;
 
@@ -391,7 +420,7 @@ err_clear_dmac:
 }
 
 static int phytium_spi_dma_transfer_one(struct phytium_spi *fts,
-					struct spi_transfer *xfer)
+				   struct spi_transfer *xfer)
 {
 	struct scatterlist *tx_sg = NULL, *rx_sg = NULL, tx_tmp, rx_tmp;
 	unsigned int tx_len = 0, rx_len = 0;
@@ -441,6 +470,12 @@ static int phytium_spi_dma_transfer_one(struct phytium_spi *fts,
 
 		dma_async_issue_pending(fts->txchan);
 
+		/*
+		 * Here we only need to wait for the DMA transfer to be
+		 * finished since SPI controller is kept enabled during the
+		 * procedure this loop implements and there is no risk to lose
+		 * data left in the Tx/Rx FIFOs.
+		 */
 		ret = phytium_spi_dma_wait(fts, len, xfer->speed_hz);
 		if (ret)
 			break;
@@ -459,7 +494,7 @@ static int phytium_spi_dma_transfer_one(struct phytium_spi *fts,
 }
 
 static int phytium_spi_dma_transfer(struct phytium_spi *fts,
-				    struct spi_transfer *xfer)
+		struct spi_transfer *xfer)
 {
 	unsigned int nents;
 	int ret;

@@ -119,7 +119,6 @@ static void phytium_reader(struct phytium_spi *fts)
 		fts->rx += fts->n_bytes;
 	}
 }
-
 int phytium_spi_check_status(struct phytium_spi *fts, bool raw)
 {
 	u32 irq_status;
@@ -151,7 +150,6 @@ int phytium_spi_check_status(struct phytium_spi *fts, bool raw)
 		if (fts->master->cur_msg)
 			fts->master->cur_msg->status = ret;
 	}
-
 	return ret;
 }
 EXPORT_SYMBOL_GPL(phytium_spi_check_status);
@@ -243,7 +241,9 @@ static int phytium_spi_transfer_one(struct spi_master *master,
 
 	if (transfer->speed_hz != fts->current_freq) {
 		if (transfer->speed_hz != chip->speed_hz) {
-			clk_div = (fts->max_freq / transfer->speed_hz + 1) & 0xfffe;
+			clk_div = (fts->max_freq / transfer->speed_hz + 1) &
+				0xfffe;
+
 			chip->speed_hz = transfer->speed_hz;
 			chip->clk_div = clk_div;
 		}
@@ -275,19 +275,21 @@ static int phytium_spi_transfer_one(struct spi_master *master,
 		cr0 |= (chip->tmode << TMOD_OFFSET);
 	}
 
-	phytium_writel(fts, CTRL0, cr0);
+	phytium_writel(fts, CTRLR0, cr0);
 
+	/* check if current transfer is a DMA transcation */
 	if (master->can_dma && master->can_dma(master, spi, transfer))
 		fts->dma_mapped = master->cur_msg_mapped;
 
 	spi_mask_intr(fts, 0xff);
 
+	/* DMA setup */
 	if (fts->dma_mapped) {
 		ret = fts->dma_ops->dma_setup(fts, transfer);
 		if (ret)
 			return ret;
 	}
-
+	/* interrupt transfer mode setup */
 	if (!chip->poll_mode && !fts->dma_mapped) {
 		txlevel = min_t(u16, fts->fifo_len / 2, fts->len / fts->n_bytes);
 		phytium_writel(fts, TXFLTR, txlevel);
@@ -354,7 +356,7 @@ static int phytium_spi_setup(struct spi_device *spi)
 	cr0 = (spi->bits_per_word - 1) | (chip->type << FRF_OFFSET) |
 	      (spi->mode << MODE_OFFSET) | (chip->tmode << TMOD_OFFSET);
 
-	phytium_writel(fts, CTRL0, cr0);
+	phytium_writel(fts, CTRLR0, cr0);
 
 	spi_enable_chip(fts, 1);
 
@@ -460,7 +462,6 @@ void phytium_spi_remove_host(struct phytium_spi *fts)
 {
 	if (fts->dma_ops && fts->dma_ops->dma_exit)
 		fts->dma_ops->dma_exit(fts);
-
 	spi_shutdown_chip(fts);
 
 	spi_unregister_controller(fts->master);
