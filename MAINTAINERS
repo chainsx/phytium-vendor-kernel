@@ -17435,6 +17435,7 @@ F:	Documentation/devicetree/bindings/input/phytium,keypad.yaml
 F:	Documentation/devicetree/bindings/interrupt-controller/phytium,ixic.yaml
 F:	Documentation/devicetree/bindings/ipmi/phytium,bt-bmc.yaml
 F:	Documentation/devicetree/bindings/ipmi/phytium,kcs-bmc.yaml
+F:	Documentation/devicetree/bindings/leds/phytnet_led.yaml
 F:	Documentation/devicetree/bindings/mailbox/phytium,mbox.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,mci.yaml
 F:	Documentation/devicetree/bindings/mmc/phytium,sdci.yaml
