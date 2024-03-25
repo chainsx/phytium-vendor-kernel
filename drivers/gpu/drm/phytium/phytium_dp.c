@@ -1729,6 +1729,7 @@ static int phytium_dp_long_pulse(struct drm_connector *connector, bool hpd_raw_s
 	enum drm_connector_status status = connector->status;
 	bool video_enable = false;
 	uint32_t index = 0;
+	struct edid *edid = NULL;
 
 	if (phytium_dp->is_edp)
 		status = connector_status_connected;
@@ -1762,6 +1763,15 @@ static int phytium_dp_long_pulse(struct drm_connector *connector, bool hpd_raw_s
 			mdelay(2);
 			phytium_dp_hw_enable_video(phytium_dp);
 		}
+
+		edid = drm_get_edid(connector, &phytium_dp->aux.ddc);
+
+		if (edid && drm_edid_is_valid(edid))
+			phytium_dp->has_audio = drm_detect_monitor_audio(edid);
+		else
+			phytium_dp->has_audio = false;
+
+		kfree(edid);
 	}
 
 out:
