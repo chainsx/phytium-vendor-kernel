@@ -253,37 +253,6 @@ static int azx_position_ok(struct azx *chip, struct azx_dev *azx_dev)
 	return 1; /* OK, it's fine */
 }
 
-static int hda_ft_dma_configure(struct device *dev)
-{
-	const struct of_device_id *match_of;
-	const struct acpi_device_id *match_acpi;
-
-	if (dev->of_node) {
-		match_of = of_match_device(dev->driver->of_match_table, dev);
-		if (!match_of) {
-			dev_err(dev, "Error DT match data is missing\n");
-			return -ENODEV;
-		}
-		set_dma_ops(dev, NULL);
-		/*
-		 * Because there is no way to transfer to non-coherent dma in
-		 * of_dma_configure if 'dma-coherent' is described in DT,
-		 * use acpi_dma_configure to alloc dma_ops correctly.
-		 */
-		acpi_dma_configure(dev, DEV_DMA_NON_COHERENT);
-	} else if (has_acpi_companion(dev)) {
-		match_acpi = acpi_match_device(dev->driver->acpi_match_table, dev);
-		if (!match_acpi) {
-			dev_err(dev, "Error ACPI match data is missing\n");
-			return -ENODEV;
-		}
-		set_dma_ops(dev, NULL);
-		acpi_dma_configure(dev, DEV_DMA_NON_COHERENT);
-	}
-
-	return 0;
-}
-
 /* The work for pending PCM period updates. */
 static void azx_irq_pending_work(struct work_struct *work)
 {
@@ -840,6 +809,7 @@ static int azx_first_init(struct azx *chip)
 	unsigned int dma_bits = 64;
 
 	struct resource *res;
+	const struct acpi_device_id *match;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	hda->regs = devm_ioremap_resource(hddev, res);
@@ -876,9 +846,15 @@ static int azx_first_init(struct azx *chip)
 			chip->align_buffer_size = 1;
 	}
 
-	err = hda_ft_dma_configure(hddev);
-	if (err < 0)
-		return err;
+	if (has_acpi_companion(hddev)) {
+		match = acpi_match_device(hddev->driver->acpi_match_table, hddev);
+		if (!match) {
+			dev_err(hddev, "Error ACPI match data is missing\n");
+			return -ENODEV;
+		}
+		set_dma_ops(hddev, NULL);
+		acpi_dma_configure(hddev, DEV_DMA_NON_COHERENT);
+	}
 
 	/* allow 64bit DMA address if supported by H/W */
 	if (!(gcap & AZX_GCAP_64OK))
