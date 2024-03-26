@@ -98,10 +98,6 @@ struct scmi_info {
 	int users;
 };
 
-#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-static bool scmi_force_polling;
-#endif
-
 #define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
 
 static const int scmi_linux_errmap[] = {
@@ -348,15 +344,6 @@ static bool scmi_xfer_done_no_timeout(struct scmi_chan_info *cinfo,
 	       ktime_after(ktime_get(), stop);
 }
 
-
-#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-static int __init scmi_set_force_polling(char *str)
-{
-	return kstrtobool(str, &scmi_force_polling);
-}
-early_param("scmi.force_polling", scmi_set_force_polling);
-#endif
-
 /**
  * scmi_do_xfer() - Do one transfer
  *
@@ -380,8 +367,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 		return -EINVAL;
 
 #ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-	if (scmi_force_polling)
-		xfer->hdr.poll_completion = true;
+	xfer->hdr.poll_completion = true;
 #endif
 
 	trace_scmi_xfer_begin(xfer->transfer_id, xfer->hdr.id,
