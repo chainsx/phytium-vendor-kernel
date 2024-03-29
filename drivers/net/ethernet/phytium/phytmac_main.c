@@ -1284,8 +1284,9 @@ tx_return:
 	return ret;
 }
 
-static int phytmac_fixedlink_phy_connect(struct fwnode_handle *fwnode)
+static bool phytmac_phy_connect_need(struct phytmac *pdata)
 {
+	struct fwnode_handle *fwnode = dev_fwnode(pdata->dev);
 	struct fwnode_handle *dn;
 	u8 pl_cfg_link_an_mode = 0;
 
@@ -1295,9 +1296,10 @@ static int phytmac_fixedlink_phy_connect(struct fwnode_handle *fwnode)
 		pl_cfg_link_an_mode = MLO_AN_FIXED;
 	fwnode_handle_put(dn);
 
-	if (pl_cfg_link_an_mode == MLO_AN_FIXED)
-		return 0;
-	return -ENODEV;
+	if (pl_cfg_link_an_mode == MLO_AN_FIXED ||
+	    phy_interface_mode_is_8023z(pdata->phy_interface))
+		return false;
+	return true;
 }
 
 static int phytmac_phylink_connect(struct phytmac *pdata)
@@ -1312,7 +1314,7 @@ static int phytmac_phylink_connect(struct phytmac *pdata)
 		ret = phylink_of_phy_connect(pdata->phylink, of_node, 0);
 
 	if (!of_node && fwnode)
-		ret = phytmac_fixedlink_phy_connect(fwnode);
+		ret = phytmac_phy_connect_need(pdata);
 
 	if (!fwnode || ret) {
 		if (pdata->mii_bus) {
@@ -1398,6 +1400,10 @@ static void phytmac_mac_config(struct phylink_config *config, unsigned int mode,
 	spin_lock_irqsave(&pdata->lock, flags);
 	hw_if->mac_config(pdata, mode, state);
 	spin_unlock_irqrestore(&pdata->lock, flags);
+}
+
+static void phytmac_mac_an_restart(struct phylink_config *config)
+{
 }
 
 static void phytmac_mac_link_down(struct phylink_config *config, unsigned int mode,
@@ -1549,6 +1555,7 @@ static void phytmac_validate(struct phylink_config *config,
 	struct phytmac *pdata = netdev_priv(ndev);
 
 	if (state->interface != PHY_INTERFACE_MODE_SGMII &&
+	    state->interface != PHY_INTERFACE_MODE_1000BASEX &&
 	    state->interface != PHY_INTERFACE_MODE_2500BASEX &&
 	    state->interface != PHY_INTERFACE_MODE_5GBASER &&
 	    state->interface != PHY_INTERFACE_MODE_10GBASER &&
@@ -1606,6 +1613,7 @@ static const struct phylink_mac_ops phytmac_phylink_ops = {
 	.validate = phytmac_validate,
 	.mac_prepare = phytmac_mac_prepare,
 	.mac_config = phytmac_mac_config,
+	.mac_an_restart = phytmac_mac_an_restart,
 	.mac_link_down = phytmac_mac_link_down,
 	.mac_link_up = phytmac_mac_link_up,
 };
