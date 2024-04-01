@@ -4802,6 +4802,7 @@ static const struct pci_dev_acs_enabled {
 	/* Broadcom multi-function device */
 	{ PCI_VENDOR_ID_BROADCOM, 0x16D7, pci_quirk_mf_endpoint_acs },
 	{ PCI_VENDOR_ID_BROADCOM, 0xD714, pci_quirk_brcm_acs },
+	{ PCI_VENDOR_ID_PHYTIUM,  0xDC01, pci_quirk_xgene_acs},
 	{ 0 }
 };
 
