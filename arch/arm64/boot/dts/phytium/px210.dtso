@@ -14,6 +14,9 @@
 				 num-dp = <3>;
            			 dp-mask = [07];
        			 };
+			vpu0: vpu@32b00000 {
+			 	 status = "disabled";
+			 };
 		};
         };
 
