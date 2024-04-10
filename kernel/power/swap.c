@@ -662,6 +662,13 @@ static int lzo_compress_threadfn(void *data)
 		d->ret = lzo1x_1_compress(d->unc, d->unc_len,
 		                          d->cmp + LZO_HEADER, &d->cmp_len,
 		                          d->wrk);
+#ifdef CONFIG_ARM64
+		/*
+		 * Ensure that compressed data is indeed written to memory
+		 * before atomic_set on weakly-ordered architectures.
+		 */
+		smp_wmb();
+#endif
 		atomic_set(&d->stop, 1);
 		wake_up(&d->done);
 	}
@@ -811,6 +818,10 @@ static int save_image_lzo(struct swap_map_handle *handle,
 		for (run_threads = thr, thr = 0; thr < run_threads; thr++) {
 			wait_event(data[thr].done,
 			           atomic_read(&data[thr].stop));
+#ifdef CONFIG_ARM64
+			/* Force data access later than written */
+			smp_rmb();
+#endif
 			atomic_set(&data[thr].stop, 0);
 
 			ret = data[thr].ret;
