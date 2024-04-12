@@ -297,16 +297,16 @@ static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
 	cmd |= BIT(QSPI_CMD_PORT_TRANSFER_SHIFT);
 	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
 
-	writeb_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
+	writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
 	readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
 
 	ret = readl_poll_timeout(qspi->io_base + QSPI_LD_PORT_REG,
-				state, !(state & 0x01), 10, 100000);
+				 state, !(state & 0x01), 10, 100000);
 	if (ret)
 		dev_err(qspi->dev, "wait device timeout\n");
 
 	/* clear wr_cfg */
-	writeb_relaxed(0x0, qspi->io_base + QSPI_WR_CFG_REG);
+	writel_relaxed(0x0, qspi->io_base + QSPI_WR_CFG_REG);
 }
 
 static int phytium_qspi_write_port(struct phytium_qspi *qspi,
