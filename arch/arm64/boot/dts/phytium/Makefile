@@ -15,3 +15,14 @@ dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-power-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000q-hanwei-board.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += phytiumpi_firefly.dtb
 dtb-$(CONFIG_ARCH_PHYTIUM) += e2000d-chillipi-edu-board.dtb
+
+dtbo-$(CONFIG_ARCH_PHYTIUM) += px210.dtbo
+dtbo-$(CONFIG_ARCH_PHYTIUM) += usb2_host_for_pe220x.dtbo
+
+#Enable support for device-tree overlay
+DTC_FLAGS += -@
+
+targets += dtbs dtbs_install
+targets += $(dtbo-y)
+
+always-y := $(dtbo-y)

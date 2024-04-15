@@ -269,6 +269,10 @@
 	edp_mask = [00];
 };
 
+&vpu0 {
+	status = "okay";
+};
+
 &i2s0 {
 	#sound-dai-cells = <0>;
 	dai-name = "phytium-i2s-lsd";

@@ -1,0 +1,23 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "phytium,pe220x";
+
+        fragment@0 {
+                target = <&soc>;
+                __overlay__ {
+                        usb2_0: usb2@31800000 {
+                                 dr_mode = "host";
+                         };      
+                        usb2_1: usb2@31880000 {
+                                 status = "disabled";
+                         };
+                        usb2_2: usb2@31900000 {
+                                 status = "disabled";
+                         };
+		};
+
+
+        };
+};

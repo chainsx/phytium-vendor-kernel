@@ -62,6 +62,9 @@ phytium_fb_alloc(struct drm_device *dev, const struct drm_mode_fb_cmd2 *mode_cmd
 
 	drm_helper_mode_fill_fb_struct(dev, &phytium_fb->base, mode_cmd);
 
+	/* In UEFI, efifb may also use dc hardware, remove it and use dcdrmfb */
+	drm_fb_helper_remove_conflicting_framebuffers(NULL, "dcdrmfb", false);
+
 	ret = drm_framebuffer_init(dev, &phytium_fb->base, &viv_fb_funcs);
 
 	if (ret) {
