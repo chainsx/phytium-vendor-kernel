@@ -2,7 +2,7 @@
 /*
  * Driver for Phytium Multimedia Card Interface
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #ifndef __PHYTIUM_MCI_H

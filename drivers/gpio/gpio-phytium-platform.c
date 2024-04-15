@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2019-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  * Derived from drivers/gpio/gpio-pl061.c
  *   Copyright (C) 2008, 2009 Provigent Ltd.
  */

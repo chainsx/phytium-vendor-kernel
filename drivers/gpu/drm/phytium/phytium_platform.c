@@ -2,10 +2,11 @@
 /*
  * Phytium display engine DRM driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/of_device.h>
+#include <linux/of_address.h>
 #include <linux/acpi.h>
 #include <drm/drm_drv.h>
 #include <linux/dma-mapping.h>
@@ -19,13 +20,29 @@
 int phytium_platform_carveout_mem_init(struct platform_device *pdev,
 						      struct phytium_display_private *priv)
 {
-	struct resource *res;
+	struct device_node *np;
+	struct resource res;
+	struct resource *pres;
 	int ret = 0;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (res) {
-		priv->pool_size = resource_size(res);
-		priv->pool_phys_addr = res->start;
+	if (pdev->dev.of_node) {
+		np = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
+		if(!np)
+			goto next;
+		ret = of_address_to_resource(np, 0, &res);
+		if(ret)
+			DRM_ERROR("No memory address assigned to the region\n");
+		else {
+			priv->pool_size = resource_size(&res);
+			priv->pool_phys_addr = res.start;
+		}
+	}
+
+next:
+	pres = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (pres) {
+		priv->pool_size = resource_size(pres);
+		priv->pool_phys_addr = pres->start;
 	}
 
 	if ((priv->pool_phys_addr != 0) && (priv->pool_size != 0)) {

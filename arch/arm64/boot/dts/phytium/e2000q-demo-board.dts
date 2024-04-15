@@ -2,7 +2,7 @@
 /*
  * DTS file for Phytium Pe2204 demo board
  *
- * Copyright (c) 2022-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
 /dts-v1/;
@@ -238,4 +238,8 @@
 
 &rng0 {
 	status = "okay";
+};
+
+&vpu0 {
+    status = "okay";
 };

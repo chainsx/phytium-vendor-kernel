@@ -2,7 +2,7 @@
 /*
  * File Name: phytium_sdci.h - Phytium FT SDCI dirver
  *
- * Copyright (c) 2019-2023, Phytium Technology Co., Ltd.
+ * Copyright (c) 2019-2024 Phytium Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
