@@ -5033,18 +5033,21 @@ static int phytium_clk_init(struct platform_device *pdev, struct clk **pclk,
 	int err = 0;
 
 	if (has_acpi_companion(&pdev->dev)) {
+		char clk_name[20];
 		/* set up macb platform data */
 		memset(&plat_data, 0, sizeof(plat_data));
 
 		/* initialize clocks */
-		plat_data.pclk = clk_register_fixed_rate(&pdev->dev, "pclk", NULL, 0,
+		snprintf(clk_name, 20, "%s-pclk", pdev->name);
+		plat_data.pclk = clk_register_fixed_rate(&pdev->dev, clk_name, NULL, 0,
 							 PHYTIUM_PCLK_RATE);
 		if (IS_ERR(plat_data.pclk)) {
 			err = PTR_ERR(plat_data.pclk);
 			goto err_pclk_register;
 		}
 
-		plat_data.hclk = clk_register_fixed_rate(&pdev->dev, "hclk", NULL, 0,
+		snprintf(clk_name, 20, "%s-hclk", pdev->name);
+		plat_data.hclk = clk_register_fixed_rate(&pdev->dev, clk_name, NULL, 0,
 							 PHYTIUM_HCLK_RATE);
 		if (IS_ERR(plat_data.hclk)) {
 			err = PTR_ERR(plat_data.hclk);
