@@ -230,3 +230,7 @@
     dp-mask = /bits/ 8 <0x3>;
     status = "okay";
 };
+
+&vpu0 {
+    status = "okay";
+};

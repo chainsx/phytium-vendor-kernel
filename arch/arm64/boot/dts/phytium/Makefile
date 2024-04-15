@@ -17,3 +17,11 @@ dtb-$(CONFIG_ARCH_PHYTIUM) += pe2202-chillipi-edu-board.dtb
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
 clean-files	:= *.dtb
+
+#Enable support for device-tree overlay
+DTC_FLAGS_pe2204-come-board += -@
+DTC_FLAGS_pe2204-demo-ddr4 += -@
+DTC_FLAGS_pe2204-edu-board += -@
+DTC_FLAGS_pe2204-hanwei-board += -@
+DTC_FLAGS_pe2204-miniitx-board += -@
+DTC_FLAGS_pe2204-vpx-board += -@
