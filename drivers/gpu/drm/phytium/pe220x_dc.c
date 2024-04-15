@@ -2,7 +2,7 @@
 /*
  * Phytium PE220X display controller DRM driver
  *
- * Copyright (c) 2021-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2021-2024 Phytium Technology Co., Ltd.
  */
 
 #include <drm/drm_atomic_helper.h>

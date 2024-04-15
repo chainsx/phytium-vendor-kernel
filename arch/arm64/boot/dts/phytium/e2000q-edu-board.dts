@@ -2,7 +2,7 @@
 /*
  * DTS file for Phytium Pe2204 edu board
  *
- * Copyright (c) 2022-2023 Phytium Technology Co., Ltd.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  *
  * Hongmin Qi <qihongmin@phytium.com.cn>
  */
@@ -262,6 +262,10 @@
 	status = "okay";
 	pipe_mask = [01];
 	edp_mask = [00];
+};
+
+&vpu0 {
+	status = "okay";
 };
 
 &i2s0 {

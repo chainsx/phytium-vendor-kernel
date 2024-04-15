@@ -84,10 +84,6 @@ struct scmi_desc {
 	int max_msg_size;
 };
 
-#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-static bool scmi_force_polling;
-#endif
-
 /**
  * struct scmi_chan_info - Structure representing a SCMI channel informfation
  *
@@ -383,8 +379,6 @@ scmi_xfer_poll_done(const struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
 		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
 }
 
-#define SCMI_MAX_POLL_TO_NS	(100 * NSEC_PER_USEC)
-
 static bool scmi_xfer_done_no_timeout(const struct scmi_chan_info *cinfo,
 				      struct scmi_xfer *xfer, ktime_t stop)
 {
@@ -392,14 +386,6 @@ static bool scmi_xfer_done_no_timeout(const struct scmi_chan_info *cinfo,
 
 	return scmi_xfer_poll_done(cinfo, xfer) || ktime_after(__cur, stop);
 }
-
-#ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-static int __init scmi_set_force_polling(char *str)
-{
-	return kstrtobool(str, &scmi_force_polling);
-}
-early_param("scmi.force_polling", scmi_set_force_polling);
-#endif
 
 /**
  * scmi_do_xfer() - Do one transfer
@@ -424,8 +410,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 		return -EINVAL;
 
 #ifdef CONFIG_ARM_SCMI_TRANSPORT_FORCE_POLLING
-	if (scmi_force_polling)
-		xfer->hdr.poll_completion = true;
+	xfer->hdr.poll_completion = true;
 #endif
 
 	ret = mbox_send_message(cinfo->chan, xfer);
@@ -438,7 +423,8 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	ret = 0;
 
 	if (xfer->hdr.poll_completion) {
-		ktime_t stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLL_TO_NS);
+		ktime_t stop = ktime_add_ms(ktime_get(),
+					    info->desc->max_rx_timeout_ms);
 
 		spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer, stop));
 
