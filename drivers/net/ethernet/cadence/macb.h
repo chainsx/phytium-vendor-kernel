@@ -186,6 +186,7 @@
 #define GEM_DCFG12		0x02AC /* Design Config 12 */
 #define GEM_USX_CONTROL		0x0A80 /* High speed PCS control register */
 #define GEM_USX_STATUS		0x0A88 /* High speed PCS status register */
+#define GEM_TAIL_ENABLE		0x0E7C /* Phytium: Enable tail */
 
 #define GEM_TXBDCTRL	0x04cc /* TX Buffer Descriptor control register */
 #define GEM_RXBDCTRL	0x04d0 /* RX Buffer Descriptor control register */
@@ -220,7 +221,7 @@
 #define GEM_IER(hw_q)		(0x0600 + ((hw_q) << 2))
 #define GEM_IDR(hw_q)		(0x0620 + ((hw_q) << 2))
 #define GEM_IMR(hw_q)		(0x0640 + ((hw_q) << 2))
-
+#define GEM_TAIL(hw_q)		(0x0e80 + ((hw_q) << 2)) /* Phytium: tail register */
 #define GEM_SRC_SEL_LN			0x1C04
 #define GEM_DIV_SEL0_LN			0x1C08
 #define GEM_DIV_SEL1_LN			0x1C0C
@@ -772,6 +773,8 @@
 #define MACB_CAPS_SG_DISABLED			0x40000000
 #define MACB_CAPS_MACB_IS_GEM			0x80000000
 #define MACB_CAPS_SEL_CLK_HW			0x00001000
+#define MACB_CAPS_SEL_CLK_HW_2			0x00002000
+#define MACB_CAPS_TAILPTR				0x00004000 /* Phytium: tail register */
 
 /* LSO settings */
 #define MACB_LSO_UFO_ENABLE			0x01
@@ -1244,7 +1247,7 @@ struct macb_queue {
 	unsigned int		RBQS;
 	unsigned int		RBQP;
 	unsigned int		RBQPH;
-
+	unsigned int		TAILADDR;
 	/* Lock to protect tx_head and tx_tail */
 	spinlock_t		tx_ptr_lock;
 	unsigned int		tx_head, tx_tail;
