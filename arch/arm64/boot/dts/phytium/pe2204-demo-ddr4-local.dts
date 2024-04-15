@@ -160,3 +160,7 @@
 	edp_mask = /bits/ 8 <0x0>;
 	status = "okay";
 };
+
+&vpu0 {
+    status = "okay";
+};
