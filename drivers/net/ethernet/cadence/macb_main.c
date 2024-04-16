@@ -699,6 +699,31 @@ static int phytium_gem_sel_clk(struct macb *bp, int spd)
 	return 0;
 }
 
+static int phytium_gem_sel_clk_2(struct macb *bp, int spd)
+{
+	int speed = 0;
+
+	if (bp->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
+	    bp->phy_interface == PHY_INTERFACE_MODE_10GBASER) {
+		speed = HS_SPEED_10000M;
+	} else if (bp->phy_interface ==  PHY_INTERFACE_MODE_5GBASER) {
+		speed = HS_SPEED_5000M;
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
+		speed = HS_SPEED_2500M;
+	} else if (bp->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		if (spd == SPEED_1000) {
+			speed = HS_SPEED_1000M;
+		} else if (spd == SPEED_100 || spd == SPEED_10) {
+			speed = HS_SPEED_100M;
+		}
+	}
+
+	gem_writel(bp, HS_MAC_CONFIG, GEM_BFINS(HS_MAC_SPEED, speed,
+						gem_readl(bp, HS_MAC_CONFIG)));
+
+	return 0;
+}
+
 static void macb_usx_pcs_link_up(struct phylink_pcs *pcs, unsigned int neg_mode,
 				 phy_interface_t interface, int speed,
 				 int duplex)
@@ -896,6 +921,9 @@ static void macb_mac_link_up(struct phylink_config *config,
 	if (bp->caps & MACB_CAPS_SEL_CLK_HW)
 		phytium_gem_sel_clk(bp, speed);
 
+	if (bp->caps & MACB_CAPS_SEL_CLK_HW_2)
+		phytium_gem_sel_clk_2(bp, speed);
+
 	ctrl = macb_or_gem_readl(bp, NCFGR);
 
 	ctrl &= ~(MACB_BIT(SPD) | MACB_BIT(FD));
@@ -1000,7 +1028,7 @@ static int macb_phylink_connect(struct macb *bp)
 	struct device_node *dn = bp->pdev->dev.of_node;
 	struct net_device *dev = bp->dev;
 	struct phy_device *phydev;
-	int ret;
+	int ret = 0;
 
 	if (dn)
 		ret = phylink_of_phy_connect(bp->phylink, dn, 0);
@@ -1013,7 +1041,8 @@ static int macb_phylink_connect(struct macb *bp)
 		}
 
 		/* attach the mac to the phy */
-		ret = phylink_connect_phy(bp->phylink, phydev);
+		if (phylink_expects_phy(bp->phylink))
+			ret = phylink_connect_phy(bp->phylink, phydev);
 	}
 
 	if (ret) {
@@ -2601,6 +2630,8 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	wmb();
 	skb_tx_timestamp(skb);
 
+	if (bp->caps & MACB_CAPS_TAILPTR)
+		queue_writel(queue, TAILADDR, BIT(31) | macb_tx_ring_wrap(bp, queue->tx_head));
 	spin_lock_irq(&bp->lock);
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
 	spin_unlock_irq(&bp->lock);
@@ -2799,6 +2830,9 @@ static void gem_init_rings(struct macb *bp)
 		desc->ctrl |= MACB_BIT(TX_WRAP);
 		queue->tx_head = 0;
 		queue->tx_tail = 0;
+
+		if (bp->caps & MACB_CAPS_TAILPTR)
+			queue_writel(queue, TAILADDR, BIT(31) | queue->tx_head);
 
 		queue->rx_tail = 0;
 		queue->rx_prepared_head = 0;
@@ -3005,6 +3039,8 @@ static void macb_init_hw(struct macb *bp)
 		bp->rx_frm_len_mask = MACB_RX_JFRMLEN_MASK;
 
 	gem_writel(bp, AXI_PIPE, 0x1010);
+	if (bp->caps & MACB_CAPS_TAILPTR)
+		gem_writel(bp, TAIL_ENABLE, 0x80000001);
 
 	macb_configure_dma(bp);
 
@@ -4331,7 +4367,8 @@ static int macb_init(struct platform_device *pdev)
 			}
 #endif
 		}
-
+		if (bp->caps & MACB_CAPS_TAILPTR)
+			queue->TAILADDR = GEM_TAIL(hw_q);
 		/* get irq: here we use the linux queue index, not the hardware
 		 * queue index. the queue irq definitions in the device tree
 		 * must remove the optional gaps that could exist in the
@@ -4997,18 +5034,21 @@ static int phytium_clk_init(struct platform_device *pdev, struct clk **pclk,
 	int err = 0;
 
 	if (has_acpi_companion(&pdev->dev)) {
+		char clk_name[20];
 		/* set up macb platform data */
 		memset(&plat_data, 0, sizeof(plat_data));
 
 		/* initialize clocks */
-		plat_data.pclk = clk_register_fixed_rate(&pdev->dev, "pclk", NULL, 0,
+		snprintf(clk_name, 20, "%s-pclk", pdev->name);
+		plat_data.pclk = clk_register_fixed_rate(&pdev->dev, clk_name, NULL, 0,
 							 PHYTIUM_PCLK_RATE);
 		if (IS_ERR(plat_data.pclk)) {
 			err = PTR_ERR(plat_data.pclk);
 			goto err_pclk_register;
 		}
 
-		plat_data.hclk = clk_register_fixed_rate(&pdev->dev, "hclk", NULL, 0,
+		snprintf(clk_name, 20, "%s-hclk", pdev->name);
+		plat_data.hclk = clk_register_fixed_rate(&pdev->dev, clk_name, NULL, 0,
 							 PHYTIUM_HCLK_RATE);
 		if (IS_ERR(plat_data.hclk)) {
 			err = PTR_ERR(plat_data.hclk);
@@ -5195,6 +5235,17 @@ static const struct macb_config phytium_config = {
 	.usrio = &macb_default_usrio,
 };
 
+static const struct macb_config phytium_gmac_config = {
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE | MACB_CAPS_JUMBO |
+		MACB_CAPS_GEM_HAS_PTP |	MACB_CAPS_BD_RD_PREFETCH |
+		MACB_CAPS_SEL_CLK_HW_2 | MACB_CAPS_TAILPTR,
+	.dma_burst_length = 16,
+	.clk_init = phytium_clk_init,
+	.init = macb_init,
+	.jumbo_max_len = 10240,
+	.usrio = &macb_default_usrio,
+};
+
 static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,at91sam9260-macb", .data = &at91sam9260_config },
 	{ .compatible = "cdns,macb" },
@@ -5219,6 +5270,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "xlnx,zynq-gem", .data = &zynq_config },
 	{ .compatible = "xlnx,versal-gem", .data = &versal_config},
 	{ .compatible = "cdns,phytium-gem", .data = &phytium_config },
+	{ .compatible = "phytium,gmac-1.0", .data = &phytium_gmac_config },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, macb_dt_ids);
@@ -5227,6 +5279,7 @@ MODULE_DEVICE_TABLE(of, macb_dt_ids);
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id macb_acpi_ids[] = {
 	{ .id = "PHYT0036", .driver_data = (kernel_ulong_t)&phytium_config },
+	{ .id = "PHYT0046", .driver_data = (kernel_ulong_t)&phytium_gmac_config },
 	{ }
 };
 
