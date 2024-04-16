@@ -1086,7 +1086,7 @@ static int macb_phylink_connect(struct macb *bp)
 	struct device_node *dn = bp->pdev->dev.of_node;
 	struct net_device *dev = bp->dev;
 	struct phy_device *phydev;
-	int ret;
+	int ret = 0;
 
 	if (dn)
 		ret = phylink_of_phy_connect(bp->phylink, dn, 0);
@@ -1099,7 +1099,8 @@ static int macb_phylink_connect(struct macb *bp)
 		}
 
 		/* attach the mac to the phy */
-		ret = phylink_connect_phy(bp->phylink, phydev);
+		if (phylink_expects_phy(bp->phylink))
+			ret = phylink_connect_phy(bp->phylink, phydev);
 	}
 
 	if (ret) {
