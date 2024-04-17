@@ -40,6 +40,7 @@ static irqreturn_t mwv207_isr(int irq_unused, void *dev_id)
 			} else
 				pr_warn("mwv207: no irq mapping set on %d", hwirq);
 
+
 			jdev_write(jdev, (0x009A802c) + i * 4, (1UL << j));
 			stat &= ~(1UL << j);
 			ret = IRQ_HANDLED;
@@ -125,8 +126,9 @@ static const struct irq_domain_ops mwv207_irq_domain_ops = {
 
 int mwv207_irq_init(struct mwv207_device *jdev)
 {
-	struct pci_dev *pdev = jdev->pdev;
+	struct pci_dev *pdev = jdev->base.pdev;
 	int ret, i;
+
 
 	for (i = 0; i < 2; ++i) {
 		jdev_write(jdev, (0x009A802c) + i * 4, 0xffffffff);
@@ -139,6 +141,7 @@ int mwv207_irq_init(struct mwv207_device *jdev)
 			&mwv207_irq_domain_ops, jdev);
 	if (!jdev->irq_domain)
 		return -ENODEV;
+
 
 	for (i = 0; i < 64; ++i)
 		irq_create_mapping(jdev->irq_domain, i);
@@ -171,7 +174,7 @@ free_mapping:
 
 void mwv207_irq_fini(struct mwv207_device *jdev)
 {
-	struct pci_dev *pdev = jdev->pdev;
+	struct pci_dev *pdev = jdev->base.pdev;
 	int i;
 
 	free_irq(pdev->irq, jdev);

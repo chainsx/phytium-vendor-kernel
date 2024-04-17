@@ -65,6 +65,7 @@ static inline u32 pipe_3d_read(struct mwv207_pipe_3d *pipe, u32 reg)
 	return pipe_read(&pipe->base, reg);
 }
 
+
 static inline bool fence_after(u32 a, u32 b)
 {
 	return (s32)(a - b) > 0;
@@ -101,6 +102,7 @@ static const struct dma_fence_ops pipe_3d_fence_ops = {
 	.release = pipe_3d_fence_release,
 };
 
+
 static inline struct dma_fence *pipe_3d_event_pop_irq(struct mwv207_pipe_3d *pipe, u32 event)
 {
 	struct dma_fence *fence;
@@ -114,6 +116,7 @@ static inline struct dma_fence *pipe_3d_event_pop_irq(struct mwv207_pipe_3d *pip
 	return fence;
 }
 
+
 static inline u32 pipe_3d_event_push(struct mwv207_pipe_3d *pipe, struct dma_fence *fence)
 {
 	u32 event;
@@ -124,6 +127,7 @@ static inline u32 pipe_3d_event_push(struct mwv207_pipe_3d *pipe, struct dma_fen
 		pipe->event_fence[event] = dma_fence_get(fence);
 	set_bit(event, pipe->event_bitmap);
 	spin_unlock_irq(&pipe->event_lock);
+
 
 	BUG_ON(event >= 30);
 
@@ -249,10 +253,13 @@ static void pipe_3d_core_reset(struct mwv207_pipe_3d *pipe)
 
 		pipe_3d_write(pipe, 0x000, 0x00090900);
 
+
 		pipe_3d_write(pipe, 0x3a8, 1);
 		pipe_3d_write(pipe, 0x3a8, 0);
 
+
 		usleep_range(1000, 1001);
+
 
 		pipe_3d_write(pipe, 0x000, 0x00010900);
 	}
@@ -265,7 +272,8 @@ static void pipe_3d_hw_init(struct mwv207_pipe_3d *pipe)
 
 	pipe_3d_write(pipe, 0x55c, 0x00ffffff);
 	pipe_3d_write(pipe, 0x414, 0x3c000000);
-	pipe_3d_write(pipe, 0x090, pipe_3d_read(pipe, 0x090) & 0xffffffbf);
+	pipe_3d_write(pipe, 0x090,
+			pipe_3d_read(pipe, 0x090) & 0xffffffbf);
 
 	pipe_3d_write(pipe, 0x000, 0x00010900);
 	pipe_3d_write(pipe, 0x000, 0x00070100);
@@ -277,6 +285,8 @@ static void pipe_3d_hw_init(struct mwv207_pipe_3d *pipe)
 
 	pipe_3d_write(pipe, 0x100, 0x00140021);
 
+
+
 	pipe_3d_write(pipe, 0x154, 0x1);
 	pipe_3d_write(pipe, 0x104, 0x00430408);
 	pipe_3d_write(pipe, 0x10c, 0x015b0880);
@@ -286,6 +296,7 @@ static void mwv207_pipe_3d_reset(struct mwv207_pipe *mpipe)
 {
 	struct mwv207_pipe_3d *pipe = to_3d_pipe(mpipe);
 	int i;
+
 
 	spin_lock_irq(&pipe->event_lock);
 	bitmap_zero(pipe->event_bitmap, 30);
@@ -302,6 +313,7 @@ static void mwv207_pipe_3d_reset(struct mwv207_pipe *mpipe)
 	pipe_3d_start(pipe);
 }
 
+
 static u32 *pipe_3d_wait_for_space(struct mwv207_pipe_3d *pipe, u32 size)
 {
 	u32 *head;
@@ -309,6 +321,7 @@ static u32 *pipe_3d_wait_for_space(struct mwv207_pipe_3d *pipe, u32 size)
 
 	for (i = 0; i < 10000; ++i) {
 		head = READ_ONCE(pipe->head);
+		
 		if (head <= pipe->tail) {
 			if (pipe_3d_ptr_span(pipe->end, pipe->tail) >= size)
 				return pipe->tail;
@@ -353,6 +366,7 @@ static struct dma_fence *mwv207_pipe_3d_submit(struct mwv207_pipe *mpipe,
 	pipe_3d_stall(pipe, 0x10, 0x1);
 	pipe_3d_loadstate(pipe, 0x502e, 0x0);
 
+
 	fence = kzalloc(sizeof(struct pipe_3d_fence), GFP_KERNEL);
 	if (!fence) {
 		pipe->tail = last_tail;
@@ -366,10 +380,12 @@ static struct dma_fence *mwv207_pipe_3d_submit(struct mwv207_pipe *mpipe,
 	fence->pipe = pipe;
 	event = pipe_3d_event_push(pipe, &fence->base);
 
+
 	pipe_3d_loadstate(pipe, 0x502e, 0x1);
 	pipe_3d_loadstate(pipe, 0x50ce, 0xf);
 	pipe_3d_loadstate(pipe, 0x0e01, 0x80 | event);
 	pipe_3d_loadstate(pipe, 0x502e, 0x0);
+
 
 	pipe_3d_wl(pipe);
 	BUG_ON(pipe_3d_ptr_span(pipe->tail, start) > size);
@@ -474,8 +490,7 @@ static unsigned long pipe_3d_max_freq_get(struct mwv207_device *jdev)
 {
 	unsigned long freq;
 
-	switch (jdev->pdev->subsystem_device)
-	{
+	switch (jdev->base.pdev->subsystem_device) {
 	case 0x9103:
 		freq = 600;
 		break;
@@ -562,6 +577,7 @@ struct mwv207_pipe *mwv207_pipe_3d_create(struct mwv207_device *jdev, int unit, 
 		goto unpin_bo;
 
 	pipe->ringbuf_bo = jbo;
+
 
 	pipe->ringbuf = (u32 *)logical;
 	pipe->ringbuf_gpu_addr = mwv207_bo_gpu_phys(jbo);

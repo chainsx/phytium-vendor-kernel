@@ -53,6 +53,7 @@ void pipe_codec_sw_pp_excute(struct pipe_codec_sw_pp *sw_pp, struct mwv207_pipe 
 		jdev_write_vram(pipe->jdev, sw_pp->wb[i].vram, &sw_pp->wb_buf[0], j * 4);
 	}
 
+
 	wmb();
 
 	sw_pp->wb_cnt = 0;

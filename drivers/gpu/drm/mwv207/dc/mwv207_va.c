@@ -13,7 +13,6 @@
 * or disclosure without the written permission of JingJiaMicro
 * Electronics Corporation is strictly prohibited.
 */
-#include <linux/version.h>
 #include <linux/delay.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_atomic.h>
@@ -112,6 +111,7 @@ static int mwv207_plane_prepare_fb(struct drm_plane *plane,
 	if (ret)
 		return ret;
 
+
 	jbo->flags |= (1<<0);
 	ret = mwv207_bo_pin_reserved(jbo, 0x2);
 	mwv207_bo_unreserve(jbo);
@@ -148,6 +148,7 @@ static u64 mwv207_plane_fb_addr(struct drm_plane *plane)
 	u32 src_x, src_y;
 	u64 fbaddr;
 
+
 	src_x = plane->state->src_x >> 16;
 	src_y = plane->state->src_y >> 16;
 
@@ -167,21 +168,28 @@ static void mwv207_primary_atomic_update(struct drm_plane *plane,
 	u32 src_w, src_h;
 	u64 fbaddr;
 
+
 	if (!plane->state->fb || !plane->state->crtc)
 		return;
+
 
 	src_w = plane->state->src_w >> 16;
 	src_h = plane->state->src_h >> 16;
 	fbaddr = mwv207_plane_fb_addr(plane);
 	fb = plane->state->fb;
 
+
 	mwv207_va_write(va, 0x434, fb->pitches[0] >> 4);
+
 
 	mwv207_va_write(va, 0x43C, ((src_h - 1) << 16) | (src_w - 1) | 0x3);
 
+
 	mwv207_va_write(va, 0x4F8, (src_w - 1) << 16);
 
+
 	mwv207_va_write(va, 0x438, fbaddr >> 6);
+
 
 	switch (fb->format->format) {
 	case DRM_FORMAT_RGB565:
@@ -205,6 +213,7 @@ static void mwv207_primary_atomic_disable(struct drm_plane *plane,
 
 }
 
+/* turn on / off cursor */
 static void mwv207_cursor_switch(struct mwv207_va *va, bool on)
 {
 	mwv207_va_modify(va, 0x478, 0xff, on ? 6 : 0);
@@ -217,14 +226,18 @@ static void mwv207_cursor_atomic_update(struct drm_plane *plane,
 	struct mwv207_va *va = plane_to_va(plane);
 	u64 fbaddr;
 
+
 	if (!plane->state->fb || !plane->state->crtc)
 		return;
+
 
 	crtc_x = plane->state->crtc_x;
 	crtc_y = plane->state->crtc_y;
 	fbaddr = mwv207_plane_fb_addr(plane);
 
+
 	mwv207_va_write(va, 0x4B4, fbaddr >> 6);
+
 
 	pos_x = crtc_x < 0 ? 0 : crtc_x;
 	hot_x = crtc_x < 0 ? -crtc_x : 0;
@@ -233,6 +246,7 @@ static void mwv207_cursor_atomic_update(struct drm_plane *plane,
 	mwv207_va_write(va, 0x454, (hot_x & 0x3f) | ((hot_y & 0x3f) << 16));
 	mwv207_va_write(va, 0x4A8, (pos_x & 0xffff) | ((pos_y & 0xffff) << 16));
 
+
 	mwv207_cursor_switch(va, 1);
 }
 
@@ -240,6 +254,7 @@ static void mwv207_cursor_atomic_disable(struct drm_plane *plane,
 		struct drm_plane_state *old_state)
 {
 	struct mwv207_va *va = plane_to_va(plane);
+
 
 	mwv207_cursor_switch(va, 0);
 }
@@ -274,11 +289,14 @@ static void mwv207_va_misc_reset(struct mwv207_va *va)
 {
 	struct mwv207_device *jdev = va->jdev;
 
+
 	jdev_write(jdev, (0x9b001c), 0xfffff);
 	jdev_write(jdev, (0x9b0020), 0xfffff);
 	jdev_write(jdev, (0x9b0024), 0xfffff);
 
+
 	jdev_write(jdev, (0x9b0028), 0x03020100);
+
 
 	jdev_write(jdev, MWV207_WIN_BASE(va->idx) + 0x2c, 0);
 }
@@ -286,6 +304,7 @@ static void mwv207_va_misc_reset(struct mwv207_va *va)
 static int mwv207_va_lut_fifo_wait(struct mwv207_va *va, u32 used)
 {
 	int i;
+
 
 	mb();
 	for (i = 0; i < 120; ++i) {
@@ -311,6 +330,7 @@ static void mwv207_va_lut_fifo_activate(struct mwv207_va *va, int rgb)
 static int mwv207_va_lut_fifo_input(struct mwv207_va *va,  u32 value)
 {
 	int ret;
+
 
 	ret = mwv207_va_lut_fifo_wait(va, 10);
 	if (ret)
@@ -396,12 +416,14 @@ static void mwv207_va_config_timing(struct mwv207_va *va)
 		m = native;
 	}
 
+
 	hblankbegin = 0;
 	hblankend   = m->crtc_htotal - m->crtc_hdisplay;
 	htotal      = m->crtc_htotal;
 	hsbegin     = m->crtc_hsync_start - m->crtc_hdisplay;
 	hsend       = m->crtc_hsync_end - m->crtc_hdisplay;
 	hhalf       = is_interleaved ? (htotal / 2 + hsbegin) : htotal / 2;
+
 
 	vblank_1field_begin = 0;
 	vblank_1field_end   = is_interleaved ?
@@ -427,9 +449,11 @@ static void mwv207_va_config_timing(struct mwv207_va *va)
 		(m->crtc_vdisplay + (m->crtc_vtotal - m->crtc_vdisplay)) * 2 +
 		(vfrontporch + vsync) * 2 + 1;
 
+
 	mwv207_va_write(va, 0x400, hsbegin | (hsend << 16));
 	mwv207_va_write(va, 0x404, hblankbegin | (hblankend << 16));
 	mwv207_va_write(va, 0x408, htotal | (hhalf << 16));
+
 
 	mwv207_va_write(va, 0x40C, vblank_1field_begin | (vblank_1field_end << 16));
 	mwv207_va_write(va, 0x458, vblank_1field_begin | (vblank_1field_end << 16));
@@ -446,7 +470,9 @@ static void mwv207_va_config_timing(struct mwv207_va *va)
 		value |= 0x2;
 	mwv207_va_write(va, 0x464, value);
 
+
 	mwv207_va_write(va, 0x420, 1);
+
 
 	value = mwv207_va_read(va, 0x2a0);
 	value &= ~0x6;
@@ -503,6 +529,7 @@ static void mwv207_crtc_atomic_disable(struct drm_crtc *crtc,
 
 	drm_crtc_vblank_off(crtc);
 
+
 	mwv207_va_write(va, 0x2c4, 0);
 	mwv207_va_write(va, 0x2c0, 0);
 	mwv207_va_write(va, 0x2a0, 2);
@@ -530,11 +557,14 @@ static void mwv207_crtc_atomic_flush(struct drm_crtc *crtc,
 	}
 }
 
+
 static void mwv207_va_reset(struct drm_crtc *crtc)
 {
 	struct mwv207_va *va = crtc_to_va(crtc);
 
+
 	mwv207_cursor_switch(va, 0);
+
 
 	mwv207_va_lut_enable(va);
 	mwv207_va_misc_reset(va);
@@ -547,6 +577,7 @@ static const struct drm_crtc_funcs mwv207_crtc_funcs = {
 	.set_config             = drm_atomic_helper_set_config,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state   = drm_atomic_helper_crtc_destroy_state,
+	.gamma_set              = drm_atomic_helper_legacy_gamma_set,
 	.page_flip              = drm_atomic_helper_page_flip,
 	.enable_vblank          = mwv207_crtc_enable_vblank,
 	.disable_vblank         = mwv207_crtc_disable_vblank,
@@ -603,6 +634,7 @@ irqreturn_t mwv207_va_handle_vblank(int irq, void *data)
 	struct mwv207_device *jdev = data;
 	struct drm_crtc *crtc;
 	u32 fired;
+
 
 	fired = jdev_read(jdev, (0x9907f4));
 	if (!fired)
@@ -663,6 +695,7 @@ static int mwv207_va_init_single(struct mwv207_device *jdev, int idx)
 		lut[i] = lut[i + 256] = lut[i + 512] = i;
 	drm_crtc_enable_color_mgmt(&va->crtc, 768, true, 768);
 	ret = drm_mode_crtc_set_gamma_size(&va->crtc, 256);
+
 
 	BUG_ON(drm_crtc_index(&va->crtc) != va->idx);
 

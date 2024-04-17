@@ -163,6 +163,7 @@ static int mwv207_submit_init_job_cmd(struct mwv207_job *mjob, struct drm_mwv207
 	if (args->cmds == 0)
 		return -EINVAL;
 
+
 	if (mjob->is_dma)
 		mjob->cmds = kmalloc(args->cmd_size, GFP_KERNEL);
 	else
@@ -268,6 +269,7 @@ static int mwv207_submit_init_job(struct drm_device *dev, struct mwv207_job *mjo
 
 	get_task_comm(mjob->comm, current);
 
+
 	mjob->ctx = mwv207_ctx_lookup(dev, filp, args->ctx);
 	if (!mjob->ctx)
 		return -ENOENT;
@@ -324,6 +326,7 @@ static int mwv207_submit_patch_entry(struct mwv207_job *mjob,
 		return -ERANGE;
 	addr = mwv207_bo_gpu_phys(jbo) + reloc->bo_offset;
 
+
 	switch (reloc->type & 0xffff) {
 	case 0:
 		if (reloc->cmd_offset + 8 > dat_size)
@@ -379,8 +382,7 @@ static int mwv207_submit_patch_dma_entry(struct mwv207_job *mjob,
 	if (loc->stride == 0 || loc->pg_nr_type != 0 ||  width == 0 || height == 0)
 		return -EINVAL;
 
-	switch (jbo->tbo.mem.mem_type)
-	{
+	switch (jbo->tbo.mem.mem_type) {
 	case TTM_PL_VRAM:
 		loc->base = mwv207_bo_gpu_phys(jbo);
 		loc->pg_nr_type = MWV207_DMA_NR_PAGES_VRAM(jbo->tbo.num_pages);
@@ -395,12 +397,14 @@ static int mwv207_submit_patch_dma_entry(struct mwv207_job *mjob,
 		break;
 	}
 
+
 	if (loc->offset >= mwv207_bo_size(jbo))
 		return -ERANGE;
 	if (loc->offset + loc->stride * (height - 1) + width <= loc->offset)
 		return -ERANGE;
 	if (loc->offset + loc->stride * (height - 1) + width > mwv207_bo_size(jbo))
 		return -ERANGE;
+
 
 	if ((loc->offset % loc->stride) + width > loc->stride)
 		return -ERANGE;
@@ -473,7 +477,9 @@ static int mwv207_submit_patch(struct drm_device *dev, struct mwv207_job *mjob)
 			}
 		}
 
+
 		jbo = mjob->cmd_dats[i].jbo;
+
 
 		ret = ttm_bo_wait(&jbo->tbo, true, false);
 		if (ret)
@@ -501,7 +507,7 @@ static int mwv207_submit_validate(struct drm_device *dev, struct mwv207_job *mjo
 	for (i = 0; i < mjob->nr_bos + mjob->nr_cmd_dat; ++i) {
 		jbo = mwv207_job_bo(mjob, i);
 
-		if (jbo->tbo.pin_count)
+		if (jbo->pin_count)
 			continue;
 
 		if (mjob->is_dma) {
@@ -538,9 +544,8 @@ static int mwv207_submit_attach_dependency(struct mwv207_job *mjob, struct drm_m
 					&mtvb->nr_shared, &mtvb->shared);
 			if (ret)
 				return ret;
-		} else {
+		} else
 			mtvb->excl = dma_resv_get_excl_rcu(resv);
-		}
 	}
 
 	if (unlikely(args->flags & 0x00000001)) {
@@ -557,6 +562,9 @@ static int mwv207_submit_commit(struct mwv207_job *mjob,
 {
 	int ret;
 
+	/* XXX: job init and push should be protected with common lock,
+	 * refer to drm_sched_entity_push_job documentation for details
+	 */
 	ret = drm_sched_job_init(&mjob->base, mjob->engine_entity, mjob->ctx);
 	if (ret)
 		return ret;
@@ -577,7 +585,9 @@ static int mwv207_submit_commit(struct mwv207_job *mjob,
 		args->fence_fd = fd;
 	}
 
+
 	*fence = &mjob->base.s_fence->finished;
+
 
 	mwv207_job_get(mjob);
 	drm_sched_entity_push_job(&mjob->base, mjob->engine_entity);

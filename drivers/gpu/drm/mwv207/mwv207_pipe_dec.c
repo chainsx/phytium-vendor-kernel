@@ -89,6 +89,7 @@ static int pipe_dec_polling(void *priv)
 		usleep_range(1000, 1001);
 		try_to_freeze();
 
+
 		fence = smp_load_acquire(&pipe->current_fence);
 		if (fence == NULL)
 			continue;
@@ -99,6 +100,7 @@ static int pipe_dec_polling(void *priv)
 
 		pipe_codec_sw_pp_excute(&pipe->sw_pp, &pipe->base);
 		pipe_dec_stat_reset(pipe, stat);
+
 
 		smp_store_release(&pipe->current_fence, NULL);
 
@@ -120,13 +122,16 @@ static void mwv207_pipe_dec_reset(struct mwv207_pipe *mpipe)
 
 	stat = pipe_dec_read(pipe, 0x4);
 	if (stat & 0x1)
-		pipe_dec_write(pipe, 0x4, 0x20 | 0x30);
+		pipe_dec_write(pipe, 0x4,
+				0x20 | 0x30);
 
 	pipe_dec_write(pipe, 0x4, 0);
 	pipe_dec_write(pipe, 0x8, 0x454);
 
+
 	for (i = 12; i < pipe->base.iosize; i += 0x4)
 		pipe_dec_write(pipe, i, 0);
+
 
 	fence = smp_load_acquire(&pipe->current_fence);
 	if (fence) {
@@ -145,9 +150,13 @@ static struct dma_fence *mwv207_pipe_dec_submit(struct mwv207_pipe *mpipe,
 	bool hw_run = 0;
 	u32 cmd, reg;
 
+	/* sanity check, there should be no previous job.
+	 * acquire pairs with release in polling thread
+	 */
 	fence = smp_load_acquire(&pipe->current_fence);
 	if (fence)
 		return ERR_PTR(-EBUSY);
+
 
 	for (pos = 0; pos <= mjob->cmd_size - 4; pos += cmdlen) {
 		cmd = *(u32 *)(mjob->cmds + pos);
@@ -186,6 +195,7 @@ static struct dma_fence *mwv207_pipe_dec_submit(struct mwv207_pipe *mpipe,
 			return ERR_PTR(-EINVAL);
 		}
 	}
+
 
 	fence = kzalloc(sizeof(struct pipe_dec_fence), GFP_KERNEL);
 	if (!fence)

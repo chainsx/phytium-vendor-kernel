@@ -55,10 +55,12 @@ struct mwv207_job {
 
 	struct dma_fence *fence_in;
 
+
 	struct mwv207_ctx *ctx;
 	struct drm_sched_entity *engine_entity;
 
 	struct kref refcount;
+
 
 	bool is_dma;
 
@@ -87,6 +89,7 @@ struct mwv207_dma_loc {
 #define MWV207_DMA_NR_PAGES(nr)      ((nr) & ~(1ULL << 63))
 #define MWV207_DMA_IS_VRAM(nr) (((nr) >> 63) == 0)
 
+
 struct mwv207_dma_cmd {
 	struct mwv207_dma_loc src;
 	struct mwv207_dma_loc dst;
@@ -96,7 +99,7 @@ struct mwv207_dma_cmd {
 
 struct devfreq;
 #define to_mwv207_sched(sched) container_of(sched, struct mwv207_sched, base)
-struct mwv207_pipe {
+struct mwv207_pipe  {
 	struct dma_fence*  (*submit)(struct mwv207_pipe *pipe, struct mwv207_job *job);
 	void               (*reset)(struct mwv207_pipe *pipe);
 	void               (*destroy)(struct mwv207_pipe *pipe);
@@ -105,6 +108,7 @@ struct mwv207_pipe {
 	const char             *fname;
 	int                    iosize;
 	void __iomem           *regbase;
+
 
 	struct device  *dev;
 	struct devfreq *devfreq;

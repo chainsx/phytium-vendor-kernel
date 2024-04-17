@@ -50,6 +50,7 @@ static void mwv207_ctx_entity_fini(struct mwv207_ctx *ctx)
 	}
 }
 
+
 static int mwv207_ctx_entity_init_single(struct mwv207_ctx *ctx,
 		struct drm_gpu_scheduler **sched,
 		struct drm_sched_entity **entities, int nr)
@@ -58,15 +59,13 @@ static int mwv207_ctx_entity_init_single(struct mwv207_ctx *ctx,
 	struct drm_sched_entity *entity;
 	int i, ret;
 
+
 	for (i = 0; i < nr; i++) {
 		scheds[i] = sched[i];
-
 		entity = kmalloc(sizeof(struct drm_sched_entity), GFP_KERNEL);
 		if (!entity)
 			return -ENOMEM;
-
 		ret = drm_sched_entity_init(entity, DRM_SCHED_PRIORITY_NORMAL, &scheds[i], 1, &ctx->guilty);
-
 		if (ret) {
 			kfree(entity);
 			return ret;
@@ -78,9 +77,7 @@ static int mwv207_ctx_entity_init_single(struct mwv207_ctx *ctx,
 		entity = kmalloc(sizeof(struct drm_sched_entity), GFP_KERNEL);
 		if (!entity)
 			return -ENOMEM;
-
-		ret = drm_sched_entity_init(entity, DRM_SCHED_PRIORITY_NORMAL, &scheds[0], i, &ctx->guilty);
-
+		ret = drm_sched_entity_init(entity, DRM_SCHED_PRIORITY_NORMAL, &scheds[0], 1, &ctx->guilty);
 		if (ret) {
 			kfree(entity);
 			return ret;
@@ -95,6 +92,7 @@ static int mwv207_ctx_entity_init(struct drm_device *dev, struct mwv207_ctx *ctx
 {
 	struct mwv207_device *jdev = ddev_to_jdev(dev);
 	int ret;
+
 
 	ctx->entity_3d  = &ctx->entities[0];
 	ctx->entity_dec = &ctx->entity_3d[2 + 1];
@@ -228,9 +226,8 @@ int mwv207_kctx_init(struct mwv207_device *jdev)
 	struct drm_gpu_scheduler *scheds[1];
 	int i;
 
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < 1; i++)
 		scheds[i] = jdev->sched_dma[i];
-	}
 
 	jdev->dma_entity = devm_kzalloc(jdev->dev, sizeof(struct drm_sched_entity), GFP_KERNEL);
 	if (!jdev->dma_entity)

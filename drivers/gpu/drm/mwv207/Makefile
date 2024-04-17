@@ -26,10 +26,8 @@ mwv207-y := mwv207_drv.o \
 	dc/mwv207_dvo.o \
 	dc/mwv207_vi.o \
 	dc/mwv207_i2c.o \
-	selftest/selftest.o
+	selftest/selftest.o \
 
 obj-$(CONFIG_DRM_MWV207) := mwv207.o
 
 ccflags-y := -I$(src)
-
-

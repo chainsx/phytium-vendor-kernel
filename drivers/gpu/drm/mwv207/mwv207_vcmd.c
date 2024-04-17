@@ -40,6 +40,7 @@ static inline int mwv207_vcmd_wait_idle(struct mwv207_device *jdev)
 {
 	int i;
 
+
 	for (i = 0; i < 1000 && !mwv207_vcmd_idle(jdev); i++)
 		usleep_range(1000, 1001);
 	return mwv207_vcmd_idle(jdev) ? 0 : -ETIMEDOUT;
@@ -75,13 +76,17 @@ static int mwv207_vcmd_execute(struct mwv207_device *jdev, int cmd,
 
 	mutex_lock(&jdev->vbios.vcmd_lock);
 
+
 	ret = mwv207_vcmd_wait_idle(jdev);
 	if (ret)
 		goto unlock;
 
+
 	mwv207_vcmd_req(jdev, cmd, idx, value, enable);
 
+
 	mwv207_vcmd_start(jdev);
+
 
 	ret = mwv207_vcmd_wait_idle(jdev);
 	if (ret)

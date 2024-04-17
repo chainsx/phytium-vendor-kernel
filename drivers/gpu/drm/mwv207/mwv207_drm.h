@@ -16,6 +16,7 @@
 #ifndef __MWV207_DRM_H__
 #define __MWV207_DRM_H__
 
+
 #include "drm/drm.h"
 
 #if defined(__cplusplus)
@@ -114,6 +115,7 @@ struct drm_mwv207_submit_reloc {
 	__u32 type;
 	__u32 pad;
 };
+
 
 struct drm_mwv207_submit_cmd_dat {
 	__u32 nr_relocs;

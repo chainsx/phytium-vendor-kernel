@@ -39,13 +39,13 @@ struct mwv207_i2c {
 static inline void mwv207_i2c_set_dir(struct mwv207_i2c *i2c, u32 mask,
 		u32 reg, bool is_input)
 {
-
 	mb();
 
 	jdev_modify(i2c->jdev, reg, mask, is_input ? mask : 0);
 
 	mb();
 }
+
 
 static void mwv207_i2c_gpio_multi(struct mwv207_i2c *i2c, int mask)
 {

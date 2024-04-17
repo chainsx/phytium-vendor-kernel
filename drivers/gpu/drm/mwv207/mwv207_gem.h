@@ -20,8 +20,6 @@
 #include <linux/types.h>
 #include "mwv207.h"
 
-extern const struct drm_gem_object_funcs mwv207_gem_object_funcs;
-
 int mwv207_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 		     struct drm_mode_create_dumb *args);
 

@@ -13,11 +13,9 @@
 * or disclosure without the written permission of JingJiaMicro
 * Electronics Corporation is strictly prohibited.
 */
-#include <linux/version.h>
 #include <linux/io-mapping.h>
 #include <drm/drm_file.h>
 #include "mwv207_drm.h"
-#include "mwv207_gem.h"
 #include "mwv207_bo.h"
 
 static void mwv207_ttm_bo_destroy(struct ttm_buffer_object *bo)
@@ -44,6 +42,9 @@ void mwv207_bo_placement_from_domain(struct mwv207_bo *jbo, u32 domain, bool pin
 	u32 c = 0;
 	u32 pflag = 0;
 
+	if (pinned)
+		pflag |= TTM_PL_FLAG_NO_EVICT;
+
 	jbo->placement.placement = jbo->placements;
 	jbo->placement.busy_placement = jbo->placements;
 
@@ -57,9 +58,11 @@ void mwv207_bo_placement_from_domain(struct mwv207_bo *jbo, u32 domain, bool pin
 
 		if (jbo->flags & (1<<0))
 			jbo->placements[c].lpfn = jdev->visible_vram_size >> PAGE_SHIFT;
-		jbo->placements[c].flags = 0;
-		jbo->placements[c].mem_type = TTM_PL_VRAM;
+		else
+			pflag |= TTM_PL_FLAG_TOPDOWN;
 
+		jbo->placements[c].mem_type = TTM_PL_VRAM;
+		jbo->placements[c].flags = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC | pflag;
 #ifdef MWV207_DEBUG_BO_MIGRATION
 		if (!pinned) {
 			if (jbo->placements[c].lpfn == 0
@@ -77,21 +80,21 @@ void mwv207_bo_placement_from_domain(struct mwv207_bo *jbo, u32 domain, bool pin
 	if (domain & 0x4) {
 		jbo->placements[c].fpfn = 0;
 		jbo->placements[c].lpfn = 0;
-		jbo->placements[c].flags = 0;
+		jbo->placements[c].flags = TTM_PL_MASK_CACHING | pflag;
 		jbo->placements[c].mem_type = TTM_PL_TT;
 		c++;
 	}
 	if (domain & 0x1) {
 		jbo->placements[c].fpfn = 0;
 		jbo->placements[c].lpfn = 0;
-		jbo->placements[c].flags = 0;
+		jbo->placements[c].flags = TTM_PL_MASK_CACHING | pflag;
 		jbo->placements[c].mem_type = TTM_PL_SYSTEM;
 		c++;
 	}
 	if (!c) {
 		jbo->placements[c].fpfn = 0;
 		jbo->placements[c].lpfn = 0;
-		jbo->placements[c].flags = 0;
+		jbo->placements[c].flags = TTM_PL_MASK_CACHING;
 		jbo->placements[c].mem_type = TTM_PL_SYSTEM;
 		c++;
 	}
@@ -125,6 +128,7 @@ int mwv207_bo_create(struct mwv207_device *jdev,
 	}
 	jbo->flags  = flags;
 	jbo->domain = domain;
+	jbo->pin_count = 0;
 
 	acc_size = ttm_bo_dma_acc_size(&jdev->bdev, size, sizeof(*jbo));
 
@@ -174,9 +178,7 @@ int mwv207_bo_kmap_reserved(struct mwv207_bo *jbo, void **ptr)
 		jbo->map_count++;
 		return 0;
 	}
-
 	ret = ttm_bo_kmap(&jbo->tbo, 0, jbo->tbo.num_pages, &jbo->kmap);
-
 	if (ret)
 		return ret;
 	jbo->kptr = ttm_kmap_obj_virtual(&jbo->kmap, &is_iomem);
@@ -203,7 +205,6 @@ void mwv207_bo_unref(struct mwv207_bo *jbo)
 		return;
 
 	ttm_bo_put(&jbo->tbo);
-	jbo = NULL;
 }
 
 struct mwv207_bo *mwv207_bo_ref(struct mwv207_bo *jbo)
@@ -220,8 +221,8 @@ int mwv207_bo_pin_reserved(struct mwv207_bo *jbo, u32 domain)
 	struct ttm_operation_ctx ctx = {false, false};
 	int ret;
 
-	if (jbo->tbo.pin_count) {
-		ttm_bo_pin(&jbo->tbo);
+	if (jbo->pin_count) {
+		jbo->pin_count++;
 		return 0;
 	}
 
@@ -231,7 +232,7 @@ int mwv207_bo_pin_reserved(struct mwv207_bo *jbo, u32 domain)
 	if (ret)
 		return ret;
 
-	ttm_bo_pin(&jbo->tbo);
+	jbo->pin_count = 1;
 
 	return 0;
 }
@@ -241,12 +242,15 @@ int mwv207_bo_unpin_reserved(struct mwv207_bo *jbo)
 	struct ttm_operation_ctx ctx = {false, false};
 	int ret, i;
 
-	if (WARN_ON_ONCE(!jbo->tbo.pin_count))
+	if (WARN_ON_ONCE(!jbo->pin_count))
 		return 0;
 
-	ttm_bo_unpin(&jbo->tbo);
-	if (jbo->tbo.pin_count)
+	jbo->pin_count--;
+	if (jbo->pin_count)
 		return 0;
+
+	for (i = 0; i < jbo->placement.num_placement; i++)
+		jbo->placements[i].flags &= ~TTM_PL_FLAG_NO_EVICT;
 
 	ret = ttm_bo_validate(&jbo->tbo, &jbo->placement, &ctx);
 	if (unlikely(ret))
@@ -293,4 +297,3 @@ int mwv207_bo_wait(struct mwv207_bo *jbo, bool no_wait)
 	ttm_bo_unreserve(&jbo->tbo);
 	return ret;
 }
-

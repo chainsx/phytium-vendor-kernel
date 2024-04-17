@@ -56,7 +56,6 @@ static int selftest;
 module_param(selftest, int, 0644);
 MODULE_PARM_DESC(selftest, "run selftest when startup");
 
-
 static int mwv207_driver_open(struct drm_device *dev, struct drm_file *file_priv)
 {
 	struct mwv207_fpriv *fpriv;
@@ -81,7 +80,32 @@ static void mwv207_driver_postclose(struct drm_device *dev,
 	kfree(fpriv);
 }
 
-DEFINE_DRM_GEM_FOPS(mwv207_drm_driver_fops);
+static int mwv207_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	struct drm_file *file_priv;
+	struct mwv207_device *jdev;
+	int ret;
+
+	file_priv = filp->private_data;
+	jdev = file_priv->minor->dev->dev_private;
+	ret =  ttm_bo_mmap(filp, vma, &jdev->bdev);
+
+	return ret;
+}
+
+static const struct file_operations mwv207_driver_fops = {
+	.owner		= THIS_MODULE,
+	.open		= drm_open,
+	.mmap		= mwv207_mmap,
+	.unlocked_ioctl	= drm_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= drm_compat_ioctl,
+#endif
+	.poll		= drm_poll,
+	.read		= drm_read,
+	.llseek		= no_llseek,
+	.release	= drm_release,
+};
 
 static const struct drm_ioctl_desc mwv207_ioctls_drm[] = {
 	DRM_IOCTL_DEF_DRV(MWV207_INFO, mwv207_db_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
@@ -94,7 +118,7 @@ static const struct drm_ioctl_desc mwv207_ioctls_drm[] = {
 
 static struct drm_driver mwv207_drm_driver = {
 	.driver_features	= DRIVER_MODESET | DRIVER_ATOMIC | DRIVER_GEM | DRIVER_RENDER,
-	.fops                   = &mwv207_drm_driver_fops,
+	.fops			= &mwv207_driver_fops,
 	.open                   = mwv207_driver_open,
 	.postclose              = mwv207_driver_postclose,
 
@@ -103,6 +127,7 @@ static struct drm_driver mwv207_drm_driver = {
 	.dumb_destroy           = drm_gem_dumb_destroy,
 
 	.gem_free_object_unlocked = mwv207_gem_free_object,
+
 	.prime_handle_to_fd     = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle     = drm_gem_prime_fd_to_handle,
 	.gem_prime_export       = drm_gem_prime_export,
@@ -142,7 +167,11 @@ static void mwv207_win_slide(struct mwv207_device *jdev, int region,
 	iatu_write(jdev, region, IATU_BAR_LIMIT_LOW_OFFSET,
 			(pci_win_base + WIN_SIZE - 1) & 0xffffffff);
 	iatu_write(jdev, region, 0x100, 0x00);
-	iatu_write(jdev, region, 0x104, 1 << 31 | IATU_REGION_MODE_ADDR << 30 | 6 << 8);
+	iatu_write(jdev, region, 0x104,
+			1 << 31
+			| IATU_REGION_MODE_ADDR << 30
+			| 6 << 8);
+
 
 	mb();
 	if (iatu_read(jdev, region, 0x118) != (axi_win_base >> 32))
@@ -154,7 +183,11 @@ static int mwv207_iatu_map_bar(struct mwv207_device *jdev, int bar, u64 axi_addr
 	iatu_write(jdev, bar + 9, 0x114, axi_addr & 0xffffffff);
 	iatu_write(jdev, bar + 9, 0x118, axi_addr >> 32);
 	iatu_write(jdev, bar + 9, 0x100, 0x00);
-	iatu_write(jdev, bar + 9, 0x104, 1 << 31 | 1 << 30 | bar << 8);
+	iatu_write(jdev, bar + 9, 0x104,
+			1 << 31
+			| 1 << 30
+			| bar << 8);
+
 
 	mb();
 	if (iatu_read(jdev, bar + 9, 0x114) != (axi_addr & 0xffffffff))
@@ -181,8 +214,8 @@ static int mwv207_iatu_init(struct mwv207_device *jdev)
 
 	spin_lock_init(&jdev->win_lock);
 
-	jdev->pci_win_base  = pci_bus_address(jdev->pdev, 2)
-			+ pci_resource_len(jdev->pdev, 2) - WIN_SIZE;
+	jdev->pci_win_base  = pci_bus_address(jdev->base.pdev, 2)
+			+ pci_resource_len(jdev->base.pdev, 2) - WIN_SIZE;
 
 	mwv207_win_slide(jdev, 0, jdev->pci_win_base, 0x10000000);
 
@@ -226,7 +259,7 @@ void jdev_write_vram(struct mwv207_device *jdev, u64 vram_addr, void *buf, int s
 	}
 }
 
-static int mwv207_remove_conflicting_framebuffers(struct pci_dev *pdev)
+static int mwv207_kick_out_firmware_fb(struct pci_dev *pdev)
 {
 	struct apertures_struct *ap;
 	bool primary = false;
@@ -291,7 +324,7 @@ static int mwv207_pci_probe(struct pci_dev *pdev,
 	struct mwv207_device *jdev;
 	int ret;
 
-	ret = mwv207_remove_conflicting_framebuffers(pdev);
+	ret = mwv207_kick_out_firmware_fb(pdev);
 	if (ret)
 		return ret;
 
@@ -309,7 +342,7 @@ static int mwv207_pci_probe(struct pci_dev *pdev,
 	jdev->base.pdev = pdev;
 	jdev->base.dev_private = jdev;
 
-	jdev->mmio = devm_ioremap(&pdev->dev,
+	jdev->mmio = devm_ioremap(jdev->dev,
 			pci_resource_start(pdev, 1), pci_resource_len(pdev, 1));
 	if (!jdev->mmio)
 		return -ENOMEM;
@@ -328,6 +361,7 @@ static int mwv207_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
+	/* magic: use hdmi-3 to probe for 92/91 (full/lite) */
 	jdev->lite = jdev_read(jdev, 0x12c0000) == 0x21 ? false : true;
 
 	pci_set_drvdata(pdev, jdev);
@@ -422,6 +456,9 @@ static int mwv207_pmops_suspend(struct device *dev)
 	if (ret)
 		return ret;
 
+	/* kernel permanently pinned boes won't be evicted, they are
+	 * handled by each module in whatever ways suitable
+	 */
 	ret = ttm_bo_evict_mm(&jdev->bdev, TTM_PL_VRAM);
 	if (ret)
 		goto fail;

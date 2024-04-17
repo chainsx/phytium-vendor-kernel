@@ -16,7 +16,6 @@
 #ifndef MWV207_H_VTIQLF2Y
 #define MWV207_H_VTIQLF2Y
 
-#include <linux/version.h>
 #include <linux/pci.h>
 #include <drm/drm_device.h>
 #include <drm/ttm/ttm_bo_driver.h>
@@ -29,6 +28,7 @@ struct mwv207_vbios {
 
 	struct mutex vcmd_lock;
 
+
 	struct mutex cfg_lock;
 	struct idr   cfg_table;
 
@@ -40,13 +40,13 @@ struct mwv207_vbios {
 #define  bdev_to_jdev(dev)  container_of(dev, struct mwv207_device, bdev)
 struct mwv207_device {
 	struct drm_device  base;
-	struct pci_dev    *pdev;
 	struct ttm_bo_device bdev;
 
 	void __iomem   *mmio;
 	void __iomem   *iatu;
 
 	void           *win;
+
 
 	spinlock_t win_lock;
 	u64     visible_vram_size;
@@ -71,7 +71,9 @@ struct mwv207_device {
 	int    nr_enc;
 	int    nr_dma;
 
+
 	struct drm_sched_entity *dma_entity;
+
 
 	spinlock_t irq_lock;
 	struct irq_domain *irq_domain;

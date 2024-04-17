@@ -133,6 +133,7 @@ static int mwv207_vga_detect_load(struct mwv207_output *output)
 	u32 r_state, g_state, b_state, value;
 	bool active;
 
+
 	if (mwv207_i2c_probe(output->ddc))
 		return connector_status_connected;
 
@@ -164,6 +165,7 @@ static int mwv207_vga_detect_ctx(struct drm_connector *connector,
 	if (!output->jdev->lite || !mwv207_vga_load_detect)
 		return mwv207_i2c_probe(output->ddc) ?
 				connector_status_connected : connector_status_disconnected;
+
 
 	return mwv207_vga_detect_load(output);
 }

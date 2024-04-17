@@ -173,6 +173,7 @@ int mwv207_kms_init(struct mwv207_device *jdev)
 	ret = request_irq(jdev->va_irq, mwv207_va_handle_vblank, 0, "mwv207_va", jdev);
 	if (ret)
 		goto cleanup;
+	jdev->base.irq_enabled = true;
 
 	ret = drm_vblank_init(&jdev->base, jdev->base.mode_config.num_crtc);
 	if (ret)

@@ -15,6 +15,7 @@
 */
 #include "mwv207_vi.h"
 
+/* userspace interfaces should be registered here, e.g i2c/backlight etc */
 int mwv207_output_late_register(struct drm_connector *connector)
 {
 	struct mwv207_output *output = connector_to_output(connector);
@@ -35,6 +36,7 @@ void mwv207_output_early_unregister(struct drm_connector *connector)
 	mwv207_i2c_destroy(output->ddc);
 }
 
+
 int mwv207_output_get_modes(struct drm_connector *connector)
 {
 	struct mwv207_output *output = connector_to_output(connector);
@@ -45,6 +47,7 @@ int mwv207_output_get_modes(struct drm_connector *connector)
 		edid = output->edid;
 	else
 		edid = drm_get_edid(connector, output->ddc);
+
 
 	output->has_audio = drm_detect_monitor_audio(edid);
 	drm_connector_update_edid_property(connector, edid);

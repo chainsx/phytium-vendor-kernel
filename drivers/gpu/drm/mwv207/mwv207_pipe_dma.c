@@ -83,6 +83,7 @@ struct mwv207_dma_cursor {
 	u64 line_pos;
 	u64 cur_pos;
 
+
 	dma_addr_t *dma_address;
 	u64 nr_pages;
 
@@ -148,24 +149,30 @@ static void pipe_dma_commit(struct mwv207_pipe_dma *pipe)
 	pipe->last_lli = &pipe->lli[pipe->cur_idx - 1];
 	pipe->last_lli->ctl |=  (1UL << (62));
 
+
 	mb();
+
 
 	pipe_dma_chan_write(pipe, chan, (0x120),
 			       ((0x3)<<(2))
 			       |((0x3)<<(0)));
 	pipe_dma_chan_write(pipe, chan, (0x124), 0x3b8e0000);
 
+
 	llp = pipe->lli_bus_addr + 0x800000000ULL;
 	pipe_dma_chan_write(pipe, chan, (0x128), llp & 0xFFFFFFFF);
 	pipe_dma_chan_write(pipe, chan, (0x12C),  llp >> 32);
+
 
 	pipe_dma_write(pipe, (0x10),
 			(1 << (1))
 			|(1 << (0)));
 
+
 	pipe_dma_write(pipe, (0x18),
 			    ((1<<chan)<<(0))
 			    |((1<<chan)<<(8)));
+
 
 	mwv207_timed_loop(tick, !pipe_dma_chan_done(pipe, chan), 5000) {
 		cpu_relax();
@@ -329,6 +336,7 @@ static struct dma_fence *mwv207_pipe_dma_submit(struct mwv207_pipe *mpipe,
 
 	BUG_ON(mjob->cmd_size != sizeof(struct mwv207_dma_cmd));
 
+
 	mwv207_cursor_init(&src, &cmd->src, cmd->width, cmd->src.stride);
 	pipe_dma_flush(pipe, &src, cmd->width * cmd->height);
 
@@ -345,6 +353,7 @@ static struct dma_fence *mwv207_pipe_dma_submit(struct mwv207_pipe *mpipe,
 		cursor_advance(&dst, len);
 	}
 	pipe_dma_commit(pipe);
+
 
 	mwv207_cursor_reset(&dst, &cmd->dst);
 	pipe_dma_invalidate(pipe, &dst, cmd->width * cmd->height);
@@ -385,9 +394,6 @@ struct mwv207_pipe *mwv207_pipe_dma_create(struct mwv207_device *jdev, int unit,
 	pipe->base.destroy = mwv207_pipe_dma_destroy;
 	pipe->base.dump_state = mwv207_pipe_dma_dump_state;
 
-	/* current TTM impl uses ttm_dma_populate which is coherent.
-	 * set to false if ttm_populate_and_map_pages is used
-	 * */
 	pipe->coherent = true;
 
 	pipe->alignment = jdev->lite ? 32 : 64;
