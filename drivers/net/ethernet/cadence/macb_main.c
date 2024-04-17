@@ -1087,7 +1087,7 @@ static int macb_phylink_connect(struct macb *bp)
 	struct net_device *dev = bp->dev;
 	struct phy_device *phydev;
 	struct macb_platform_data *pdata = dev_get_platdata(&bp->pdev->dev);
-	int ret;
+	int ret = 0;
 
 	if (pdata && pdata->phytium_macb_pdata.properties) {
 		phylink_start(bp->phylink);
@@ -1106,7 +1106,8 @@ static int macb_phylink_connect(struct macb *bp)
 		phydev->force_mode = bp->force_phy_mode;
 
 		/* attach the mac to the phy */
-		ret = phylink_connect_phy(bp->phylink, phydev);
+		if (phylink_expects_phy(bp->phylink))
+			ret = phylink_connect_phy(bp->phylink, phydev);
 	}
 
 	if (ret) {
