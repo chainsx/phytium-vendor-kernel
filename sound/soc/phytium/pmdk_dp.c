@@ -31,27 +31,6 @@ static const struct snd_soc_dapm_route pmdk_dp_audio_map[] = {
 	{"DP", NULL, "TX"},
 };
 
-static struct snd_soc_jack_pin dp0_pins[] = {
-	{
-		.pin	= "HDMI/DP,pcm=0",
-		.mask	= SND_JACK_LINEOUT,
-	},
-};
-
-static struct snd_soc_jack_pin dp1_pins[] = {
-	{
-		.pin	= "HDMI/DP,pcm=1",
-		.mask	= SND_JACK_LINEOUT,
-	},
-};
-
-static struct snd_soc_jack_pin dp2_pins[] = {
-	{
-		.pin	= "HDMI/DP,pcm=2",
-		.mask	= SND_JACK_LINEOUT,
-	},
-};
-
 #define SMDK_DAI_FMT (SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | \
 	SND_SOC_DAIFMT_CBS_CFS)
 
@@ -62,10 +41,8 @@ static int pmdk_dp0_init(struct snd_soc_pcm_runtime *runtime)
 	struct snd_soc_component *component = asoc_rtd_to_codec(runtime, 0)->component;
 	int ret;
 
-	ret = snd_soc_card_jack_new_pins(card, "HDMI/DP,pcm=0",
-					 SND_JACK_LINEOUT,
-					 &priv->jack0, dp0_pins,
-					 ARRAY_SIZE(dp0_pins));
+	ret = snd_soc_card_jack_new(card, "HDMI/DP,pcm=0", SND_JACK_LINEOUT,
+				    &priv->jack0);
 
 	if (ret) {
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
@@ -83,10 +60,8 @@ static int pmdk_dp1_init(struct snd_soc_pcm_runtime *runtime)
 	struct snd_soc_component *component = asoc_rtd_to_codec(runtime, 0)->component;
 	int ret;
 
-	ret = snd_soc_card_jack_new_pins(card, "HDMI/DP,pcm=1",
-					 SND_JACK_LINEOUT,
-					 &priv->jack1, dp1_pins,
-					 ARRAY_SIZE(dp1_pins));
+	ret = snd_soc_card_jack_new(card, "HDMI/DP,pcm=1", SND_JACK_LINEOUT,
+				    &priv->jack1);
 
 	if (ret) {
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
@@ -103,10 +78,9 @@ static int pmdk_dp2_init(struct snd_soc_pcm_runtime *runtime)
 	struct snd_soc_component *component = asoc_rtd_to_codec(runtime, 0)->component;
 	int ret;
 
-	ret = snd_soc_card_jack_new_pins(card, "HDMI/DP,pcm=2",
-					 SND_JACK_LINEOUT,
-					 &priv->jack2, dp2_pins,
-					 ARRAY_SIZE(dp2_pins));
+	ret = snd_soc_card_jack_new(card, "HDMI/DP,pcm=2", SND_JACK_LINEOUT,
+				    &priv->jack2);
+
 	if (ret) {
 		dev_err(card->dev, "Jack creation failed %d\n", ret);
 		return ret;
