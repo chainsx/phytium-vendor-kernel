@@ -98,6 +98,7 @@ static int pipe_enc_polling(void *priv)
 		usleep_range(1000, 1001);
 		try_to_freeze();
 
+
 		fence = smp_load_acquire(&pipe->current_fence);
 		if (fence == NULL)
 			continue;
@@ -108,6 +109,7 @@ static int pipe_enc_polling(void *priv)
 
 		pipe_codec_sw_pp_excute(&pipe->sw_pp, &pipe->base);
 		pipe_enc_stat_reset(pipe, stat);
+
 
 		smp_store_release(&pipe->current_fence, NULL);
 
@@ -128,8 +130,10 @@ static void mwv207_pipe_enc_reset(struct mwv207_pipe *mpipe)
 
 	pipe_enc_write(pipe, 0x14, 0);
 
+
 	for (i = 4; i < pipe->base.iosize; i += 0x4)
 		pipe_enc_write(pipe, i, 0);
+
 
 	fence = smp_load_acquire(&pipe->current_fence);
 	if (fence) {
@@ -154,6 +158,7 @@ static struct dma_fence *mwv207_pipe_enc_submit(struct mwv207_pipe *mpipe,
 	fence = smp_load_acquire(&pipe->current_fence);
 	if (fence)
 		return ERR_PTR(-EBUSY);
+
 
 	for (pos = 0; pos <= mjob->cmd_size - 4; pos += cmdlen) {
 		cmd = *(u32 *)(mjob->cmds + pos);
@@ -192,6 +197,7 @@ static struct dma_fence *mwv207_pipe_enc_submit(struct mwv207_pipe *mpipe,
 			return ERR_PTR(-EINVAL);
 		}
 	}
+
 
 	fence = kzalloc(sizeof(struct pipe_enc_fence), GFP_KERNEL);
 	if (!fence)

@@ -27,6 +27,7 @@ struct pipe_codec_wb_entry {
 	u32 nr;
 };
 
+
 struct pipe_codec_sw_pp {
 	struct pipe_codec_wb_entry wb[JPIPE_WRITE_ENTRY_SIZE];
 	u32  wb_buf[JPIPE_REG_NUM];

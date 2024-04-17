@@ -15,8 +15,6 @@
 */
 #ifndef MWV207_BO_H_T4ETFCB2
 #define MWV207_BO_H_T4ETFCB2
-
-#include <linux/version.h>
 #include <linux/types.h>
 #include <drm/drm_gem.h>
 #include <drm/ttm/ttm_bo_api.h>
@@ -37,6 +35,7 @@ struct mwv207_bo {
 	struct ttm_place placements[3];
 	u32    domain;
 	u32    flags;
+	int    pin_count;
 	int    map_count;
 	void  *kptr;
 #ifdef MWV207_DEBUG_BO_MIGRATION
@@ -45,7 +44,7 @@ struct mwv207_bo {
 };
 
 struct mwv207_ttm_tt {
-	struct ttm_dma_tt             ttm;
+	struct ttm_dma_tt         ttm;
 	struct mwv207_device     *jdev;
 };
 #define to_gtt(ttm_tt) container_of(ttm_tt, struct mwv207_ttm_tt, ttm.ttm)

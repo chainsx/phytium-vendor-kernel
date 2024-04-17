@@ -127,7 +127,8 @@ static ssize_t utilization_show(struct device *dev, struct device_attribute *att
 
 	busy_time = ktime_to_ns(pipe->busy_time);
 
-	mwv207_devfreq_pipe_reset(pipe);
+	if (strncmp(pipe->devfreq->governor_name, DEVFREQ_GOV_SIMPLE_ONDEMAND, DEVFREQ_NAME_LEN))
+		mwv207_devfreq_pipe_reset(pipe);
 
 	spin_unlock_irqrestore(&pipe->devfreq_lock, flags);
 

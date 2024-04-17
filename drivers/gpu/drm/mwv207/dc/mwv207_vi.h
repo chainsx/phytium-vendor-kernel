@@ -23,11 +23,15 @@
 #ifndef MWV207_DAL_H_OUVHEJAX
 #define MWV207_DAL_H_OUVHEJAX
 
+
+
 struct i2c_adapter;
+
 
 struct mwv207_output {
 	struct drm_connector connector;
 	struct drm_encoder   encoder;
+
 
 	struct drm_crtc      *cur_crtc;
 
@@ -66,6 +70,7 @@ bool mwv207_i2c_probe(struct i2c_adapter *i2c_bus);
 
 int mwv207_output_late_register(struct drm_connector *connector);
 void mwv207_output_early_unregister(struct drm_connector *connector);
+
 
 int mwv207_output_get_modes(struct drm_connector *connector);
 void mwv207_output_set_crtc(struct drm_encoder *encoder, struct drm_crtc *crtc);

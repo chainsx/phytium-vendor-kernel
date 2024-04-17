@@ -65,6 +65,7 @@ int mwv207_db_add(struct mwv207_device *jdev, u32 key, u32 val)
 	db->db[db->nr].val = val;
 	db->nr++;
 
+
 	if (db->sorted)
 		mwv207_db_sort(jdev);
 
@@ -93,6 +94,7 @@ void mwv207_db_sort(struct mwv207_device *jdev)
 		return;
 
 	sort(db->db, db->nr, 8, cmp_key, NULL);
+
 
 	for (i = 0; i < db->nr - 1; ++i) {
 		if (db->db[i].key == db->db[i + 1].key) {

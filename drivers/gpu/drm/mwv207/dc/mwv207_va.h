@@ -18,6 +18,10 @@
 #define MWV207_VA_H_BSY8LF4F
 
 struct drm_crtc;
+/* Note: any resources allocated should be:
+ * 1. devres managed or
+ * 2. cleaned up by drm_mode_config_cleanup
+ */
 int mwv207_va_init(struct mwv207_device *jdev);
 
 void mwv207_crtc_prepare_vblank(struct drm_crtc *crtc);

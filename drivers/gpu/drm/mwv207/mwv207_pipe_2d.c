@@ -90,6 +90,7 @@ static inline void pipe_2d_barrier(struct mwv207_pipe_2d *pipe)
 	mb();
 }
 
+
 static inline bool fence16_after(u16 a, u16 b)
 {
 	return (s16)(a - b) > 0;
@@ -173,23 +174,28 @@ static int pipe_2d_hw_init(struct mwv207_pipe_2d *pipe)
 		return ret;
 	}
 
+
 	val = jdev_read(pipe->jdev, (0x009B0048));
 	val &= ~(1 << 8);
 	jdev_write(pipe->jdev, (0x009B0048), val);
+
 
 	val = jdev_read(pipe->jdev, (0x009B0014));
 	val &= ~(1 << 16);
 	jdev_write(pipe->jdev, (0x009B0014), val);
 
+
 	val = jdev_read(pipe->jdev, (0x009B0048));
 	val |= 1 << 8;
 	jdev_write(pipe->jdev, (0x009B0048), val);
+
 
 	val = jdev_read(pipe->jdev, (0x009B0014));
 	val |= 1 << 16;
 	jdev_write(pipe->jdev, (0x009B0014), val);
 
 	msleep(10);
+
 
 	pipe_2d_write(pipe, 0x4800, 0);
 
@@ -356,10 +362,12 @@ mwv207_pipe_2d_submit(struct mwv207_pipe *mpipe, struct mwv207_job *mjob)
 	last_tail = pipe->tail;
 	pipe->tail = start;
 
+
 	*pipe->tail++ = 0x80000000;
 	pipe->tail++;
 	*pipe->tail++ = 0x80000000;
 	*pipe->tail++ = 0x80000000;
+
 
 	memcpy_toio(pipe->tail, mjob->cmds, mjob->cmd_size);
 	pipe->tail += mjob->cmd_size >> 2;
@@ -367,16 +375,20 @@ mwv207_pipe_2d_submit(struct mwv207_pipe *mpipe, struct mwv207_job *mjob)
 	     nop_cnt > 0; nop_cnt -= 4)
 		*pipe->tail++ = 0x80000000;
 
+
 	fence = pipe_2d_append_fence(pipe);
 	if (IS_ERR(fence)) {
 		pipe->tail = last_tail;
 		return fence;
 	}
 
+
 	wait = pipe_2d_append_wl(pipe);
+
 
 	BUG_ON(pipe_2d_ptr_span(pipe->tail, start) & 0xf);
 	start[1] = pipe_2d_ptr_span(pipe->tail, start) / 16 - 1;
+
 
 	pipe_2d_wtol(pipe, start, wait);
 
@@ -436,8 +448,7 @@ static unsigned long pipe_2d_max_freq_get(struct mwv207_device *jdev)
 {
 	unsigned long  freq;
 
-	switch (jdev->pdev->subsystem_device)
-	{
+	switch (jdev->base.pdev->subsystem_device) {
 	case 0x9103:
 		freq = 600;
 		break;

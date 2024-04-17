@@ -13,7 +13,6 @@
 * or disclosure without the written permission of JingJiaMicro
 * Electronics Corporation is strictly prohibited.
 */
-#include <linux/version.h>
 #include <linux/delay.h>
 #include <drm/drm.h>
 #include <drm/drm_print.h>
@@ -21,7 +20,7 @@
 #include <drm/drm_debugfs.h>
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
-#include <drm/ttm/ttm_tt.h>
+#include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_placement.h>
 
@@ -33,13 +32,15 @@
 static int mwv207_mem_visible(struct mwv207_device *jdev, struct ttm_resource *mem)
 {
 	if (mem->mem_type == TTM_PL_SYSTEM ||
-		mem->mem_type == TTM_PL_TT)
+	    mem->mem_type == TTM_PL_TT)
 		return true;
 	if (mem->mem_type != TTM_PL_VRAM)
 		return false;
 
-	return (((mem->start + mem->num_pages) << PAGE_SHIFT) < jdev->visible_vram_size);
+
+	return ((mem->start << PAGE_SHIFT) + mem->size < jdev->visible_vram_size);
 }
+
 
 static void mwv207_evict_flags(struct ttm_buffer_object *bo,
 		struct ttm_placement *placement)
@@ -64,6 +65,7 @@ static void mwv207_evict_flags(struct ttm_buffer_object *bo,
 	jbo = to_jbo(bo);
 	jdev = ddev_to_jdev(jbo->tbo.base.dev);
 
+	/* evict order: * visible vram -> invisible vram -> GTT -> SYSTEM */
 	if (bo->mem.mem_type == TTM_PL_VRAM) {
 		if (jdev->visible_vram_size != jdev->vram_size
 			&& mwv207_mem_visible(jdev, &bo->mem)) {
@@ -71,8 +73,8 @@ static void mwv207_evict_flags(struct ttm_buffer_object *bo,
 			mwv207_bo_placement_from_domain(jbo,
 					0x2 | 0x4,
 					false);
-			BUG_ON(!(jbo->placements[0].mem_type == TTM_PL_VRAM));
-			BUG_ON(!(jbo->placements[1].mem_type == TTM_PL_TT));
+			BUG_ON(!(jbo->placements[0].mem_type & TTM_PL_VRAM));
+			BUG_ON(!(jbo->placements[1].mem_type & TTM_PL_TT));
 			jbo->placements[0].fpfn = jdev->visible_vram_size >> PAGE_SHIFT;
 			jbo->placements[0].lpfn = 0;
 			jbo->placement.placement = &jbo->placements[0];
@@ -93,6 +95,10 @@ static int mwv207_ttm_io_mem_reserve(struct ttm_bo_device *bdev,
 	struct mwv207_device *jdev = bdev_to_jdev(bdev);
 	size_t bus_size = (size_t)mem->num_pages << PAGE_SHIFT;
 
+	mem->bus.addr = NULL;
+	mem->bus.offset = 0;
+	mem->bus.is_iomem = false;
+
 	switch (mem->mem_type) {
 	case TTM_PL_SYSTEM:
 	case TTM_PL_TT:
@@ -112,7 +118,23 @@ static int mwv207_ttm_io_mem_reserve(struct ttm_bo_device *bdev,
 	return 0;
 }
 
-static void mwv207_ttm_tt_destroy(struct ttm_bo_device *bdev, struct ttm_tt *ttm)
+static int mwv207_ttm_tt_bind(struct ttm_bo_device *bdev,
+		struct ttm_tt *ttm,
+		struct ttm_resource *bo_mem)
+{
+	if (!bo_mem)
+		return -EINVAL;
+	return 0;
+}
+
+static void mwv207_ttm_tt_unbind(struct ttm_bo_device *bdev,
+		struct ttm_tt *ttm)
+{
+	return ;
+}
+
+static void mwv207_ttm_tt_destroy(struct ttm_bo_device *bdev,
+		struct ttm_tt *ttm)
 {
 	struct mwv207_ttm_tt *gtt = to_gtt(ttm);
 	ttm_tt_destroy_common(bdev, ttm);
@@ -131,9 +153,7 @@ static struct ttm_tt *mwv207_ttm_tt_create(struct ttm_buffer_object *bo,
 	gtt = kzalloc(sizeof(struct mwv207_ttm_tt), GFP_KERNEL);
 	if (gtt == NULL)
 		return NULL;
-
 	gtt->jdev = jdev;
-
 	if (ttm_dma_tt_init(&gtt->ttm, bo, page_flags)) {
 		kfree(gtt);
 		return NULL;
@@ -142,8 +162,8 @@ static struct ttm_tt *mwv207_ttm_tt_create(struct ttm_buffer_object *bo,
 }
 
 static int mwv207_ttm_tt_populate(struct ttm_bo_device *bdev,
-			struct ttm_tt *ttm,
-			struct ttm_operation_ctx *ctx)
+		struct ttm_tt *ttm,
+		struct ttm_operation_ctx *ctx)
 {
 	struct mwv207_ttm_tt *gtt = to_gtt(ttm);
 	struct mwv207_device *jdev = bdev_to_jdev(bdev);
@@ -151,12 +171,13 @@ static int mwv207_ttm_tt_populate(struct ttm_bo_device *bdev,
 	return ttm_dma_populate(&gtt->ttm, jdev->dev, ctx);
 }
 
-static void mwv207_ttm_tt_unpopulate(struct ttm_bo_device *bdev, struct ttm_tt *ttm)
+static void mwv207_ttm_tt_unpopulate(struct ttm_bo_device *bdev,
+		struct ttm_tt *ttm)
 {
 	struct mwv207_ttm_tt *gtt = to_gtt(ttm);
 	struct mwv207_device *jdev = bdev_to_jdev(bdev);
 
-	return ttm_dma_unpopulate(&gtt->ttm, jdev->dev);
+	ttm_dma_unpopulate(&gtt->ttm, jdev->dev);
 }
 
 static int mwv207_ttm_job_submit(struct mwv207_job *mjob, struct dma_fence **fence)
@@ -185,22 +206,24 @@ static struct mwv207_job *mwv207_ttm_job_alloc(struct ttm_buffer_object *bo)
 	if (!mjob)
 		return ERR_PTR(-ENOMEM);
 
+
 	dma_cmd = kmalloc(sizeof(*dma_cmd), GFP_KERNEL);
 	if (!dma_cmd) {
 		ret = -ENOMEM;
 		goto err;
 	}
 	dma_cmd->src.offset = 0;
-	dma_cmd->dst.offset = 0;
-	dma_cmd->height = 1;
 	dma_cmd->src.stride = bo->mem.size;
+	dma_cmd->dst.offset = 0;
 	dma_cmd->dst.stride = bo->mem.size;
 	dma_cmd->width = bo->mem.size;
+	dma_cmd->height = 1;
 
 	mjob->cmds = (char *)dma_cmd;
 	mjob->cmd_size = sizeof(*dma_cmd);
 	mjob->engine_entity = ddev_to_jdev(bo->base.dev)->dma_entity;
 	mjob->is_dma = true;
+
 
 	mjob->mtvb = kzalloc(sizeof(struct mwv207_tvb), GFP_KERNEL);
 	if (!mjob->mtvb) {
@@ -212,7 +235,6 @@ static struct mwv207_job *mwv207_ttm_job_alloc(struct ttm_buffer_object *bo)
 
 	ret = dma_resv_get_fences_rcu(bo->base.resv, &mtvb->excl,
 			&mtvb->nr_shared, &mtvb->shared);
-
 	if (ret)
 		goto err;
 
@@ -307,6 +329,91 @@ static int mwv207_move_vram_vram(struct ttm_buffer_object *bo, bool evict,
 	return ret;
 }
 
+static int mwv207_move_vram_ram(struct ttm_buffer_object *bo, bool evict,
+				struct ttm_operation_ctx *ctx,
+				struct ttm_resource *new_mem)
+{
+	struct ttm_placement placement;
+	struct ttm_place placements;
+	struct ttm_resource tmp_mem;
+	int ret;
+
+	if (new_mem->mem_type == TTM_PL_TT)
+		return mwv207_move_vram_gtt(bo, evict, ctx, new_mem);
+
+
+	tmp_mem = *new_mem;
+	tmp_mem.mm_node = NULL;
+	placement.num_placement = 1;
+	placement.placement = &placements;
+	placement.num_busy_placement = 1;
+	placement.busy_placement = &placements;
+	placements.fpfn = 0;
+	placements.lpfn = 0;
+	placements.flags = TTM_PL_MASK_CACHING;
+	placements.mem_type = TTM_PL_TT;
+	ret = ttm_bo_mem_space(bo, &placement, &tmp_mem, ctx);
+	if (unlikely(ret))
+		return ret;
+
+	ret = ttm_tt_set_placement_caching(bo->ttm, tmp_mem.placement);
+	if (unlikely(ret))
+		goto out;
+
+	ret = ttm_tt_populate(bo->bdev, bo->ttm, ctx);
+	if (unlikely(ret))
+		goto out;
+
+	ret = mwv207_move_vram_gtt(bo, evict, ctx, &tmp_mem);
+	if (likely(!ret))
+		ret = ttm_bo_move_ttm(bo, ctx, new_mem);
+out:
+	ttm_resource_free(bo, &tmp_mem);
+	return ret;
+}
+
+static int mwv207_move_ram_vram(struct ttm_buffer_object *bo, bool evict,
+				struct ttm_operation_ctx *ctx,
+				struct ttm_resource *new_mem)
+{
+	struct ttm_placement placement;
+	struct ttm_place placements;
+	struct ttm_resource tmp_mem;
+	int ret;
+
+	if (bo->mem.mem_type == TTM_PL_TT)
+		return mwv207_move_gtt_vram(bo, evict, ctx, new_mem);
+
+
+	tmp_mem = *new_mem;
+	tmp_mem.mm_node = NULL;
+	placement.num_placement = 1;
+	placement.placement = &placements;
+	placement.num_busy_placement = 1;
+	placement.busy_placement = &placements;
+	placements.fpfn = 0;
+	placements.lpfn = 0;
+	placements.flags = TTM_PL_MASK_CACHING;
+	placements.mem_type = TTM_PL_TT;
+	ret = ttm_bo_mem_space(bo, &placement, &tmp_mem, ctx);
+	if (unlikely(ret))
+		return ret;
+
+	ret = ttm_bo_move_ttm(bo, ctx, &tmp_mem);
+	if (unlikely(ret))
+		goto out;
+
+	ret = mwv207_move_gtt_vram(bo, evict, ctx, new_mem);
+out:
+	ttm_resource_free(bo, &tmp_mem);
+	return ret;
+}
+
+static int mwv207_mem_in_ram(struct ttm_resource *mem)
+{
+	return mem->mem_type == TTM_PL_SYSTEM || mem->mem_type == TTM_PL_TT;
+}
+
 static int mwv207_bo_move(struct ttm_buffer_object *bo, bool evict,
 		struct ttm_operation_ctx *ctx,
 		struct ttm_resource *new_mem)
@@ -316,54 +423,51 @@ static int mwv207_bo_move(struct ttm_buffer_object *bo, bool evict,
 	struct mwv207_device *jdev;
 	int ret;
 
-	if (WARN_ON_ONCE(jbo->tbo.pin_count > 0))
+	if (WARN_ON_ONCE(jbo->pin_count > 0))
 		return -EINVAL;
 
 	jdev = ddev_to_jdev(jbo->tbo.base.dev);
 	if (old_mem->mem_type == TTM_PL_SYSTEM && bo->ttm == NULL) {
+
 		ttm_bo_move_null(bo, new_mem);
-		goto out;
+		return 0;
 	}
 
-	if (old_mem->mem_type == TTM_PL_SYSTEM &&
-		new_mem->mem_type == TTM_PL_TT) {
+	if (mwv207_mem_in_ram(old_mem) && mwv207_mem_in_ram(new_mem)) {
+
 		ttm_bo_move_null(bo, new_mem);
-		goto out;
+		return 0;
 	}
 
-	if (old_mem->mem_type == TTM_PL_TT &&
-		new_mem->mem_type == TTM_PL_SYSTEM) {
-		ttm_resource_free(bo, &bo->mem);
-		ttm_bo_assign_mem(bo, new_mem);
-		goto out;
-	}
-
-	if ((old_mem->mem_type == TTM_PL_SYSTEM &&
-		 new_mem->mem_type == TTM_PL_VRAM) ||
-		(old_mem->mem_type == TTM_PL_VRAM &&
-		 new_mem->mem_type == TTM_PL_SYSTEM)) {
-		return -EMULTIHOP;
-	}
-
-	if (old_mem->mem_type == TTM_PL_TT && new_mem->mem_type == TTM_PL_VRAM) {
-		ret = mwv207_move_gtt_vram(bo, evict, ctx, new_mem);
-	} else if (old_mem->mem_type == TTM_PL_VRAM && new_mem->mem_type == TTM_PL_TT) {
-		ret = mwv207_move_vram_gtt(bo, evict, ctx, new_mem);
-	} else if (old_mem->mem_type == TTM_PL_VRAM && new_mem->mem_type == TTM_PL_VRAM) {
+	if (old_mem->mem_type == TTM_PL_VRAM &&
+	    mwv207_mem_in_ram(new_mem)) {
+		ret = mwv207_move_vram_ram(bo, evict, ctx, new_mem);
+	} else if (mwv207_mem_in_ram(old_mem) &&
+		   new_mem->mem_type == TTM_PL_VRAM) {
+		ret = mwv207_move_ram_vram(bo, evict, ctx, new_mem);
+	} else if (old_mem->mem_type == TTM_PL_VRAM &&
+		   new_mem->mem_type == TTM_PL_VRAM) {
 		ret = mwv207_move_vram_vram(bo, evict, ctx, new_mem);
 	} else {
 		ret = -EINVAL;
 	}
-	if (ret) {
-		ret = ttm_bo_move_memcpy(bo, ctx, new_mem);
-		if (ret)
-			return ret;
-	}
 
+	if (ret == 0)
+		goto moved;
+
+
+	if (!mwv207_mem_visible(jdev, new_mem)
+			|| !mwv207_mem_visible(jdev, old_mem)) {
+		pr_err("mwv207: can't move invisible mem by cpu");
+		return ret;
+	}
+	ret = ttm_bo_move_memcpy(bo, ctx, new_mem);
+	if (ret)
+		return ret;
+moved:
 	if (!mwv207_mem_visible(jdev, new_mem))
 		jbo->flags &= ~(1<<0);
 
-out:
 	return 0;
 }
 
@@ -380,7 +484,7 @@ static void mwv207_bo_move_notify(struct ttm_buffer_object *bo,
 	jdev = ddev_to_jdev(jbo->tbo.base.dev);
 }
 
-int mwv207_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
+static int mwv207_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 {
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
@@ -407,6 +511,14 @@ int mwv207_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	if ((offset + size) <= jdev->visible_vram_size)
 		return 0;
 
+	if (jbo->pin_count > 0)
+		return -EINVAL;
+
+	/* TODO:
+	 * 1. moving to RAM won't invoke swap, and thus causing ENOMEM when
+	 *    system memory is low. figure out why.
+	 * 2. slide iatu window to optimize out this validation.
+	 */
 	domain = 0x2;
 retry:
 	mwv207_bo_placement_from_domain(jbo, domain, false);
@@ -422,9 +534,10 @@ retry:
 		return ret;
 	}
 
+
 	offset = bo->mem.start << PAGE_SHIFT;
 	if (bo->mem.mem_type == TTM_PL_VRAM &&
-		(offset + size) > jdev->visible_vram_size) {
+	    (offset + size) > jdev->visible_vram_size) {
 		DRM_ERROR("bo validation goes crazy");
 		return -EINVAL;
 	}
@@ -432,25 +545,23 @@ retry:
 	return ret;
 }
 
-
 static int mwv207_bo_verify_access(struct ttm_buffer_object *tbo, struct file *filp)
 {
 	return drm_vma_node_verify_access(&tbo->base.vma_node,
 					  filp->private_data);
 }
 
-
-
 static struct ttm_bo_driver mwv207_bo_driver = {
 	.ttm_tt_create = mwv207_ttm_tt_create,
 	.ttm_tt_populate = mwv207_ttm_tt_populate,
 	.ttm_tt_unpopulate = mwv207_ttm_tt_unpopulate,
+	.ttm_tt_bind = &mwv207_ttm_tt_bind,
+	.ttm_tt_unbind = &mwv207_ttm_tt_unbind,
 	.ttm_tt_destroy = &mwv207_ttm_tt_destroy,
 	.eviction_valuable = ttm_bo_eviction_valuable,
 	.evict_flags = mwv207_evict_flags,
 	.move = mwv207_bo_move,
 	.io_mem_reserve = mwv207_ttm_io_mem_reserve,
-
 	.move_notify = mwv207_bo_move_notify,
 	.fault_reserve_notify = &mwv207_bo_fault_reserve_notify,
 	.verify_access = mwv207_bo_verify_access,
@@ -470,12 +581,14 @@ int mwv207_ttm_init(struct mwv207_device *jdev)
 		return ret;
 	}
 
+
 	ret = ttm_range_man_init(&jdev->bdev, TTM_PL_TT, true,
 			0x80000000ULL >> PAGE_SHIFT);
 	if (ret) {
 		DRM_ERROR("failed to initialize GTT heap.\n");
 		goto out_no_vram;
 	}
+
 
 	ret = ttm_range_man_init(&jdev->bdev, TTM_PL_VRAM, false,
 			jdev->vram_size >> PAGE_SHIFT);

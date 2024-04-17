@@ -49,6 +49,7 @@ static void mwv207_job_fini(struct kref *kref)
 	if (mjob->base.s_fence)
 		drm_sched_job_cleanup(&mjob->base);
 
+
 	mwv207_for_each_mtvb(mtvb, mjob) {
 		for (i = 0; i < mtvb->nr_shared; ++i)
 			dma_fence_put(mtvb->shared[i]);
@@ -199,7 +200,11 @@ static void mwv207_sched_timedout_job(struct drm_sched_job *job)
 
 	sched->pipe->reset(sched->pipe);
 
+	list_for_each_entry(timedout_job, &sched->base.ring_mirror_list, node)
+		mwv207_devfreq_record_idle(sched->pipe);
+
 	drm_sched_resubmit_jobs(&sched->base);
+
 
 	drm_sched_start(&sched->base, true);
 }
@@ -235,8 +240,7 @@ static struct drm_gpu_scheduler *mwv207_sched_create(struct mwv207_device *jdev,
 	sched->pipe = pipe;
 
 	ret = drm_sched_init(&sched->base, &mwv207_sched_ops, hw_submission, hang_limit,
-			msecs_to_jiffies(timeout),
-			pipe->fname);
+			msecs_to_jiffies(timeout), pipe->fname);
 	if (ret)
 		goto err;
 
@@ -261,6 +265,7 @@ int mwv207_sched_suspend(struct mwv207_device *jdev)
 {
 	struct mwv207_sched *sched;
 	int i, ret;
+
 
 	for (i = 0; i < 6; i++) {
 		if (!jdev->sched[i])
@@ -308,6 +313,12 @@ int mwv207_sched_init(struct mwv207_device *jdev)
 	jdev->sched_2d  = &jdev->sched_enc[1];
 	jdev->sched_dma = &jdev->sched_2d[1];
 
+	/* ownership of pipe passed to mwv207_sched_create, don't reference
+	 * this pipe after call to mwv207_sched_create.
+	 *
+	 * Note sched limit of 3d should be lower than hw event count, which
+	 * is 30 for 91/92. otherwise pipe 3d will BUG_ON
+	 */
 	pipe = mwv207_pipe_3d_create(jdev, 0, 0x900000, "mwv207_3d0");
 	jdev->sched_3d[0] = mwv207_sched_create(jdev, 30, 5, 2000, pipe);
 	if (jdev->sched_3d[0] == NULL)

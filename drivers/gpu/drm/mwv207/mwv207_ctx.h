@@ -24,6 +24,7 @@ struct mwv207_ctx {
 
 	struct drm_sched_entity *entities[11];
 
+
 	struct drm_sched_entity **entity_3d;
 	struct drm_sched_entity **entity_dec;
 	struct drm_sched_entity **entity_enc;

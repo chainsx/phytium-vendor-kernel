@@ -273,11 +273,9 @@ static void mwv207_hdmi_phy_switch(struct mwv207_hdmi *hdmi, int enable)
 
 	if (enable) {
 		mwv207_output_write(output, regbase + 0x84, 0x80);
-		mwv207_output_modify(output, MWV207_HDMI_CTRL(output->idx),
-				1 << 28, 0 << 28);
+		mwv207_output_modify(output, MWV207_HDMI_CTRL(output->idx), 1 << 28, 0 << 28);
 	} else {
-		mwv207_output_modify(output, MWV207_HDMI_CTRL(output->idx),
-				1 << 28, 1 << 28);
+		mwv207_output_modify(output, MWV207_HDMI_CTRL(output->idx), 1 << 28, 1 << 28);
 		mwv207_output_write(output, regbase + 0x84, 0x00);
 	}
 }
@@ -378,7 +376,6 @@ static void mwv207_hdmi_ih_mutes(struct mwv207_hdmi *hdmi)
 
 static void mwv207_hdmi_phy_setup_hpd(struct mwv207_hdmi *hdmi)
 {
-
 	mwv207_hdmi_writeb(hdmi, 0x02, 0x3007);
 	mwv207_hdmi_writeb(hdmi, 0x1, 0x0104);
 
@@ -487,7 +484,7 @@ static void mwv207_hdmi_av_composer(struct mwv207_hdmi *hdmi, const struct drm_d
 		    (tmdsclock > 340000000 ||
 		     hdmi_info->scdc.scrambling.low_rates) ? 0x80 : 0x00);
 
-	inv_val |= mode->flags & DRM_MODE_FLAG_PVSYNC ?	0x40 : 0x00;
+	inv_val |= mode->flags & DRM_MODE_FLAG_PVSYNC ? 0x40 : 0x00;
 
 	inv_val |= mode->flags & DRM_MODE_FLAG_PHSYNC ? 0x20 : 0x00;
 
@@ -508,6 +505,7 @@ static void mwv207_hdmi_av_composer(struct mwv207_hdmi *hdmi, const struct drm_d
 	mwv207_hdmi_writeb(hdmi, rate >> 16, 0x1010);
 	mwv207_hdmi_writeb(hdmi, rate >> 8, 0x100F);
 	mwv207_hdmi_writeb(hdmi, rate, 0x100E);
+
 
 	mwv207_output_modify(output, MWV207_HDMI_CTRL(output->idx), 0x1 << 9,
 			(mode->flags & DRM_MODE_FLAG_PHSYNC ? 1 : 0) << 9);
@@ -535,7 +533,8 @@ static void mwv207_hdmi_av_composer(struct mwv207_hdmi *hdmi, const struct drm_d
 	if (mwv207_hdmi_support_scdc(hdmi, display)) {
 		if (tmdsclock > 340000000 ||
 		    hdmi_info->scdc.scrambling.low_rates) {
-			drm_scdc_readb(hdmi->base.ddc, SCDC_SINK_VERSION, &bytes);
+			drm_scdc_readb(hdmi->base.ddc, SCDC_SINK_VERSION,
+				       &bytes);
 			drm_scdc_writeb(hdmi->base.ddc, SCDC_SOURCE_VERSION,
 				min_t(u8, bytes, 0x1));
 
@@ -576,7 +575,6 @@ static void mwv207_hdmi_av_composer(struct mwv207_hdmi *hdmi, const struct drm_d
 
 static void mwv207_hdmi_enable_video_path(struct mwv207_hdmi *hdmi)
 {
-
 	mwv207_hdmi_writeb(hdmi, 12, 0x1011);
 	mwv207_hdmi_writeb(hdmi, 32, 0x1012);
 	mwv207_hdmi_writeb(hdmi, 1, 0x1013);
@@ -621,6 +619,7 @@ static void mwv207_hdmi_config_AVI(struct mwv207_hdmi *hdmi,
 	struct hdmi_avi_infoframe frame;
 	u8 val;
 
+
 	drm_hdmi_avi_infoframe_from_display_mode(&frame, connector, mode);
 
 	drm_hdmi_avi_infoframe_quant_range(&frame, connector, mode,
@@ -642,10 +641,12 @@ static void mwv207_hdmi_config_AVI(struct mwv207_hdmi *hdmi,
 		val |= 0x04;
 	mwv207_hdmi_writeb(hdmi, val, 0x1019);
 
+
 	val = ((frame.colorimetry & 0x3) << 6) |
 	      ((frame.picture_aspect & 0x3) << 4) |
 	      (frame.active_aspect & 0xf);
 	mwv207_hdmi_writeb(hdmi, val, 0x101A);
+
 
 	val = ((frame.extended_colorimetry & 0x7) << 4) |
 	      ((frame.quantization_range & 0x3) << 2) |
@@ -654,8 +655,10 @@ static void mwv207_hdmi_config_AVI(struct mwv207_hdmi *hdmi,
 		val |= 0x80;
 	mwv207_hdmi_writeb(hdmi, val, 0x101B);
 
+
 	val = frame.video_code & 0x7f;
 	mwv207_hdmi_writeb(hdmi, val, 0x101C);
+
 
 	val = ((1 << 4) & 0xF0);
 	mwv207_hdmi_writeb(hdmi, val, 0x10E0);
@@ -762,7 +765,7 @@ static void mwv207_hdmi_video_packetize(struct mwv207_hdmi *hdmi)
 
 	mwv207_hdmi_writeb(hdmi, remap_size, 0x0803);
 
-	vp_conf = 0x40 | 0x00 | 0x0;
+	vp_conf = 0x40 | 0x00 |	0x0;
 
 	mwv207_hdmi_modb(hdmi, vp_conf, 0x40 | 0x20 | 0x8, 0x0804);
 
@@ -858,7 +861,6 @@ static void mwv207_hdmi_set_timing(struct mwv207_hdmi *hdmi)
 
 	if (hdmi->sink_has_audio) {
 		mwv207_hdmi_enable_audio_clk(hdmi, 1);
-
 	}
 
 	if (hdmi->sink_is_hdmi) {
@@ -901,7 +903,6 @@ static int mwv207_hdmi_get_modes(struct drm_connector *connector)
 static enum drm_mode_status mwv207_hdmi_mode_valid(struct mwv207_hdmi *hdmi,
 		const struct drm_display_mode *mode)
 {
-
 	if (mode->clock >= 384000)
 		return MODE_CLOCK_HIGH;
 

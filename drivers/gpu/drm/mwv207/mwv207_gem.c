@@ -13,14 +13,10 @@
 * or disclosure without the written permission of JingJiaMicro
 * Electronics Corporation is strictly prohibited.
 */
-#include <linux/version.h>
-#include <drm/drm_gem_ttm_helper.h>
-#include <drm/drm_prime.h>
 #include <drm/drm_utils.h>
 #include "mwv207_drm.h"
 #include "mwv207_gem.h"
 #include "mwv207_bo.h"
-#include "mwv207_ttm.h"
 
 static int mwv207_gem_create(struct mwv207_device *jdev,
 		u64 size, u64 align, u32 preferred_domain,
@@ -29,7 +25,6 @@ static int mwv207_gem_create(struct mwv207_device *jdev,
 	struct mwv207_bo *jbo;
 	int ret;
 
-	*gobj = NULL;
 retry:
 
 	ret = mwv207_bo_create(jdev, size, align, ttm_bo_type_device,
@@ -50,8 +45,7 @@ retry:
 		return ret;
 	}
 
-	*gobj = &jbo->tbo.base;
-
+	*gobj = mwv207_gem_from_bo(jbo);
 	return 0;
 }
 
@@ -159,4 +153,3 @@ int  mwv207_gem_wait_ioctl(struct drm_device *dev, void *data,
 
 	return ret;
 }
-
