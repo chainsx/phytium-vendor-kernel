@@ -506,6 +506,8 @@ static void mwv207_crtc_disable_vblank(struct drm_crtc *crtc)
 static int mwv207_crtc_atomic_check(struct drm_crtc *crtc,
 			      struct drm_crtc_state *state)
 {
+	if (state->gamma_lut && drm_color_lut_size(state->gamma_lut) != 256)
+		return -EINVAL;
 	return 0;
 }
 
