@@ -1,0 +1,13 @@
+config DRM_MWV207
+	tristate "MWV207 chip"
+	depends on DRM
+	select DRM_KMS_HELPER
+	select SND_PCM
+	select DRM_VRAM_HELPER
+	select DRM_SCHED
+	select DRM_TTM
+	select DRM_TTM_HELPER
+	help
+	  Choose this option if you have a Jingjia graphics card. 
+          If M is selected, the module will be called mwv207 (JM9100).
+
