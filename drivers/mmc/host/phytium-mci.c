@@ -680,6 +680,8 @@ phytium_mci_start_data(struct phytium_mci_host *host, struct mmc_request *mrq,
 		phytium_mci_data_sg_write_2_fifo(host, data);
 
 	spin_lock_irqsave(&host->lock, flags);
+	mod_timer(&host->timeout_timer,
+		  jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 	sdr_set_bits(host->base + MCI_INT_MASK, cmd_ints_mask | data_ints_mask);
 	if (host->is_use_dma && host->adtc_type == BLOCK_RW_ADTC) {
 		sdr_set_bits(host->base + MCI_DMAC_INT_ENA, dmac_ints_mask);
@@ -695,9 +697,6 @@ phytium_mci_start_data(struct phytium_mci_host *host, struct mmc_request *mrq,
 	wmb(); /* drain writebuffer */
 	writel(rawcmd, host->base + MCI_CMD);
 	spin_unlock_irqrestore(&host->lock, flags);
-
-	mod_timer(&host->timeout_timer,
-		jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 }
 
 static void phytium_mci_track_cmd_data(struct phytium_mci_host *host,
@@ -804,13 +803,12 @@ static void phytium_mci_start_command(struct phytium_mci_host *host,
 	}
 
 	spin_lock_irqsave(&host->lock, flags);
+	mod_timer(&host->timeout_timer,
+		  jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 	sdr_set_bits(host->base + MCI_INT_MASK, cmd_ints_mask);
 	writel(cmd->arg, host->base + MCI_CMDARG);
 	writel(rawcmd, host->base + MCI_CMD);
 	spin_unlock_irqrestore(&host->lock, flags);
-
-	mod_timer(&host->timeout_timer,
-		jiffies + msecs_to_jiffies(MMC_REQ_TIMEOUT_MS));
 }
 
 static void
