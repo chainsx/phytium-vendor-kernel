@@ -403,6 +403,8 @@ int phytium_spi_add_host(struct device *dev, struct phytium_spi *fts)
 	fts->dma_addr = (dma_addr_t)(fts->paddr + DR);
 	snprintf(fts->name, sizeof(fts->name), "phytium_spi%d", fts->bus_num);
 
+	spi_hw_init(dev, fts);
+
 	ret = request_irq(fts->irq, phytium_spi_irq, IRQF_SHARED, fts->name, master);
 	if (ret < 0) {
 		dev_err(dev, "can not get IRQ\n");
@@ -423,8 +425,6 @@ int phytium_spi_add_host(struct device *dev, struct phytium_spi *fts)
 	master->dev.of_node = dev->of_node;
 	master->dev.fwnode = dev->fwnode;
 	master->flags = SPI_CONTROLLER_GPIO_SS;
-
-	spi_hw_init(dev, fts);
 
 	if (fts->dma_ops && fts->dma_ops->dma_init) {
 		ret = fts->dma_ops->dma_init(dev, fts);
