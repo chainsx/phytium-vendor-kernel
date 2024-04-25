@@ -1757,7 +1757,7 @@ static int phytmac_open(struct net_device *ndev)
 
 	ret = phytmac_phylink_connect(pdata);
 	if (ret) {
-		netdev_err(ndev, "phylink connet failed,(error %d)\n",
+		netdev_err(ndev, "phylink connect failed,(error %d)\n",
 			   ret);
 		goto reset_hw;
 	}

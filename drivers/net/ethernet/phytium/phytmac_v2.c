@@ -874,7 +874,7 @@ static  unsigned int phytmac_tx_map_desc(struct phytmac_queue *queue,
 
 		desc->desc2 = upper_32_bits(tx_skb->addr);
 		desc->desc0 = lower_32_bits(tx_skb->addr);
-		/* make newly desc1 to hardward */
+		/* make newly desc1 to hardware */
 		wmb();
 		desc->desc1 = ctrl;
 	} while (i != queue->tx_tail);
