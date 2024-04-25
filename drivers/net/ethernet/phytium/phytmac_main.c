@@ -1446,6 +1446,9 @@ static void phytmac_mac_config(struct phylink_config *config, unsigned int mode,
 			    phy_modes(state->interface), mode);
 	}
 
+	pdata->speed = state->speed;
+	pdata->duplex = state->duplex;
+
 	spin_lock_irqsave(&pdata->lock, flags);
 	hw_if->mac_config(pdata, mode, state);
 	spin_unlock_irqrestore(&pdata->lock, flags);
