@@ -46,6 +46,7 @@ MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 #define RX_BUFFER_MULTIPLE	64  /* bytes */
 #define MAX_MTU 3072
 #define RING_ADDR_INTERVAL 128
+#define MAX_RING_ADDR_ALLOC_TIMES 3
 
 #define RX_RING_BYTES(pdata)	(sizeof(struct phytmac_dma_desc)	\
 				 * (pdata)->rx_ring_size)
@@ -59,6 +60,23 @@ MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
  * false amba_error in TX path from the DMA assuming there is not enough
  * space in the SRAM (16KB) even when there is.
  */
+
+static int phytmac_queue_phyaddr_check(struct phytmac *pdata, dma_addr_t ring_base_addr,
+				       int offset)
+{
+	u32 bus_addr_high;
+	int i;
+
+	/* Check the high address of the DMA ring. */
+	bus_addr_high = upper_32_bits(ring_base_addr);
+	for (i = 1; i < pdata->queues_num; i++) {
+		ring_base_addr += offset;
+		if (bus_addr_high != upper_32_bits(ring_base_addr))
+			return -EFAULT;
+	}
+
+	return 0;
+}
 
 static int phytmac_change_mtu(struct net_device *ndev, int new_mtu)
 {
@@ -369,19 +387,36 @@ static int phytmac_alloc_tx_resource(struct phytmac *pdata)
 	struct phytmac_dma_desc *tx_ring_base;
 	dma_addr_t tx_ring_base_addr;
 	unsigned int q;
-	int size;
+	int tx_offset;
+	int tx_size;
+	int size = 0;
+	int ret, i;
 
-	size = pdata->queues_num * (TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch +
-				    RING_ADDR_INTERVAL);
-	tx_ring_base = dma_alloc_coherent(pdata->dev, size,
-					  &tx_ring_base_addr, GFP_KERNEL);
-	if (!tx_ring_base)
-		goto err;
+	tx_offset = TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch + RING_ADDR_INTERVAL;
+	tx_size = pdata->queues_num * tx_offset;
+	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
+		if (i == MAX_RING_ADDR_ALLOC_TIMES)
+			goto err;
+
+		tx_ring_base = dma_alloc_coherent(pdata->dev, tx_size,
+						  &tx_ring_base_addr, GFP_KERNEL);
+		if (!tx_ring_base)
+			continue;
+
+		ret = phytmac_queue_phyaddr_check(pdata, tx_ring_base_addr,
+						  tx_offset);
+		if (ret) {
+			dma_free_coherent(pdata->dev, tx_size, tx_ring_base,
+					  tx_ring_base_addr);
+			continue;
+		} else {
+			break;
+		}
+	}
 
 	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q, ++queue) {
-		size = TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch + RING_ADDR_INTERVAL;
-		queue->tx_ring = (void *)tx_ring_base + q * size;
-		queue->tx_ring_addr = tx_ring_base_addr + q * size;
+		queue->tx_ring = (void *)tx_ring_base + q * tx_offset;
+		queue->tx_ring_addr = tx_ring_base_addr + q * tx_offset;
 		if (!queue->tx_ring)
 			goto err;
 
@@ -400,7 +435,6 @@ static int phytmac_alloc_tx_resource(struct phytmac *pdata)
 				    "Allocated %d TX struct tx_skb entries at %p\n",
 				    pdata->tx_ring_size, queue->tx_skb);
 	}
-	tx_ring_base = NULL;
 
 	return 0;
 err:
@@ -415,21 +449,37 @@ static int phytmac_alloc_rx_resource(struct phytmac *pdata)
 	struct phytmac_hw_if *hw_if = pdata->hw_if;
 	struct phytmac_dma_desc *rx_ring_base;
 	dma_addr_t rx_ring_base_addr;
+	int rx_offset;
+	int rx_size;
 	unsigned int q;
-	int size;
-	int i;
+	int size = 0;
+	int ret, i;
 
-	size = pdata->queues_num * (RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch +
-				    RING_ADDR_INTERVAL);
-	rx_ring_base = dma_alloc_coherent(pdata->dev, size,
-					  &rx_ring_base_addr, GFP_KERNEL);
-	if (!rx_ring_base)
-		goto err;
+	rx_offset = RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch + RING_ADDR_INTERVAL;
+	rx_size = pdata->queues_num * rx_offset;
+	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
+		if (i == MAX_RING_ADDR_ALLOC_TIMES)
+			goto err;
+
+		rx_ring_base = dma_alloc_coherent(pdata->dev, rx_size,
+						  &rx_ring_base_addr, GFP_KERNEL);
+		if (!rx_ring_base)
+			continue;
+
+		ret = phytmac_queue_phyaddr_check(pdata, rx_ring_base_addr,
+						  rx_offset);
+		if (ret) {
+			dma_free_coherent(pdata->dev, rx_size, rx_ring_base,
+					  rx_ring_base_addr);
+			continue;
+		} else {
+			break;
+		}
+	}
 
 	for (q = 0, queue = pdata->queues; q < pdata->queues_num; ++q, ++queue) {
-		size = RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch + RING_ADDR_INTERVAL;
-		queue->rx_ring = (void *)rx_ring_base + q * size;
-		queue->rx_ring_addr = rx_ring_base_addr + q * size;
+		queue->rx_ring = (void *)rx_ring_base + q * rx_offset;
+		queue->rx_ring_addr = rx_ring_base_addr + q * rx_offset;
 		if (!queue->rx_ring)
 			goto err;
 
@@ -451,7 +501,6 @@ static int phytmac_alloc_rx_resource(struct phytmac *pdata)
 				    "Allocated %d RX struct sk_buff entries at %p\n",
 				    pdata->rx_ring_size, queue->rx_skb);
 	}
-	rx_ring_base = NULL;
 
 	return 0;
 err:
