@@ -2,6 +2,8 @@
 
 #include <linux/ethtool.h>
 #include <linux/phy.h>
+#include <linux/pci.h>
+#include <linux/platform_device.h>
 #include "phytmac.h"
 #include "phytmac_v1.h"
 #include "phytmac_v2.h"
@@ -498,6 +500,19 @@ static inline void phytmac_set_msglevel(struct net_device *ndev, u32 level)
 	pdata->msg_enable = level;
 }
 
+static void phytmac_get_drvinfo(struct net_device *ndev, struct ethtool_drvinfo *drvinfo)
+{
+	struct phytmac *pdata = netdev_priv(ndev);
+
+	strncpy(drvinfo->driver, PHYTMAC_DRV_NAME, sizeof(drvinfo->driver));
+	strncpy(drvinfo->version, PHYTMAC_DRIVER_VERSION, sizeof(drvinfo->version));
+
+	if (pdata->platdev)
+		strncpy(drvinfo->bus_info, pdata->platdev->name, sizeof(drvinfo->bus_info));
+	else if (pdata->pcidev)
+		strncpy(drvinfo->bus_info, pci_name(pdata->pcidev), sizeof(drvinfo->bus_info));
+}
+
 static const struct ethtool_ops phytmac_ethtool_ops = {
 	.get_regs_len			= phytmac_get_regs_len,
 	.get_regs			= phytmac_get_regs,
@@ -520,6 +535,7 @@ static const struct ethtool_ops phytmac_ethtool_ops = {
 	.set_channels			= phytmac_set_channels,
 	.get_wol			= phytmac_get_wol,
 	.set_wol			= phytmac_set_wol,
+	.get_drvinfo			= phytmac_get_drvinfo,
 };
 
 void phytmac_set_ethtool_ops(struct net_device *ndev)
