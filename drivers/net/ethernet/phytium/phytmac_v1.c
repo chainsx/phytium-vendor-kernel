@@ -927,6 +927,14 @@ static unsigned int phytmac_rx_map_desc(struct phytmac_queue *queue,
 	return 0;
 }
 
+static unsigned int phytmac_zero_rx_desc_addr(struct phytmac_dma_desc *desc)
+{
+	desc->desc2 = 0;
+	desc->desc0 = PHYTMAC_BIT(RX_USED);
+
+	return 0;
+}
+
 static void phytmac_tx_start(struct phytmac_queue *queue)
 {
 	struct phytmac *pdata = queue->pdata;
@@ -960,9 +968,19 @@ static int phytmac_tx_complete(const struct phytmac_dma_desc *desc)
 	return PHYTMAC_GET_BITS(desc->desc1, TX_USED);
 }
 
-static int phytmac_rx_complete(const struct phytmac_dma_desc *desc)
+static bool phytmac_rx_complete(const struct phytmac_dma_desc *desc)
 {
-	return (desc->desc0 & PHYTMAC_BIT(RX_USED)) != 0;
+	dma_addr_t addr;
+	bool used;
+
+	used = desc->desc0 & PHYTMAC_BIT(RX_USED);
+	addr = ((u64)(desc->desc2) << 32);
+	addr |= desc->desc0 & 0xfffffff8;
+
+	if (used != 0 && addr != 0)
+		return true;
+	else
+		return false;
 }
 
 static int phytmac_rx_pkt_len(struct phytmac *pdata, const struct phytmac_dma_desc *desc)
@@ -1011,7 +1029,7 @@ static void phytmac_clear_rx_desc(struct phytmac_queue *queue, int begin, int en
 	if (begin > end)
 		tmp = end + queue->pdata->rx_ring_size;
 
-	for (frag = begin; frag != end; frag++) {
+	for (frag = begin; frag != tmp; frag++) {
 		desc = phytmac_get_rx_desc(queue, frag);
 		desc->desc0 &= ~PHYTMAC_BIT(RX_USED);
 	}
@@ -1359,6 +1377,7 @@ struct phytmac_hw_if phytmac_1p0_hw = {
 	.rx_pkt_end = phytmac_rx_eof,
 	.clear_rx_desc = phytmac_clear_rx_desc,
 	.clear_tx_desc = phytmac_clear_tx_desc,
+	.zero_rx_desc_addr = phytmac_zero_rx_desc_addr,
 	/* ptp */
 	.init_ts_hw = phytmac_ptp_init_hw,
 	.set_time = phytmac_set_time,

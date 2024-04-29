@@ -415,6 +415,7 @@ static int phytmac_alloc_tx_resource(struct phytmac *pdata)
 	int ret, i;
 
 	tx_offset = TX_RING_BYTES(pdata) + pdata->tx_bd_prefetch + RING_ADDR_INTERVAL;
+	tx_offset = ALIGN(tx_offset, 4096);
 	tx_size = pdata->queues_num * tx_offset;
 	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
 		if (i == MAX_RING_ADDR_ALLOC_TIMES)
@@ -477,6 +478,7 @@ static int phytmac_alloc_rx_resource(struct phytmac *pdata)
 	int ret, i;
 
 	rx_offset = RX_RING_BYTES(pdata) + pdata->rx_bd_prefetch + RING_ADDR_INTERVAL;
+	rx_offset = ALIGN(rx_offset, 4096);
 	rx_size = pdata->queues_num * rx_offset;
 	for (i = 0; i < MAX_RING_ADDR_ALLOC_TIMES + 1; i++) {
 		if (i == MAX_RING_ADDR_ALLOC_TIMES)
@@ -797,7 +799,6 @@ static void phytmac_add_rx_frag(struct phytmac_queue *queue,
 }
 
 static struct sk_buff *phytmac_build_skb(struct phytmac_rx_buffer *rx_buffer,
-					 struct phytmac_dma_desc *desc,
 					 unsigned int size)
 {
 	struct sk_buff *skb;
@@ -844,8 +845,9 @@ static struct sk_buff *phytmac_rx_single(struct phytmac_queue *queue, struct phy
 
 	len = hw_if->get_rx_pkt_len(pdata, desc);
 	rx_buffer = phytmac_get_rx_buffer(queue, queue->rx_tail, len);
+	hw_if->zero_rx_desc_addr(desc);
 
-	skb = phytmac_build_skb(rx_buffer, desc, len);
+	skb = phytmac_build_skb(rx_buffer, len);
 	if (unlikely(!skb)) {
 		netdev_err(pdata->ndev,
 			   "rx single build skb failed\n");
@@ -890,8 +892,9 @@ static struct sk_buff *phytmac_rx_frame(struct phytmac_queue *queue,
 
 	desc = phytmac_get_rx_desc(queue, first_frag);
 	rx_buffer = phytmac_get_rx_buffer(queue, first_frag, frag_len);
+	hw_if->zero_rx_desc_addr(desc);
 
-	skb = phytmac_build_skb(rx_buffer, desc, frag_len);
+	skb = phytmac_build_skb(rx_buffer, frag_len);
 	if (unlikely(!skb)) {
 		netdev_err(pdata->ndev, "rx frame build skb failed\n");
 		pdata->ndev->stats.rx_dropped++;
@@ -905,6 +908,7 @@ static struct sk_buff *phytmac_rx_frame(struct phytmac_queue *queue,
 	for (frag = first_frag + 1; ; frag++) {
 		desc = phytmac_get_rx_desc(queue, frag);
 		rx_buffer = phytmac_get_rx_buffer(queue, frag, frag_len);
+		hw_if->zero_rx_desc_addr(desc);
 
 		if (offset + frag_len > total_len) {
 			if (unlikely(frag != last_frag)) {
