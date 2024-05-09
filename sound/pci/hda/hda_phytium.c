@@ -655,7 +655,7 @@ static int azx_free(struct azx *chip)
 	}
 
 	if (bus->irq >= 0) {
-		free_irq(bus->irq, (void*)chip);
+		free_irq(bus->irq, (void *)chip);
 		bus->irq = -1;
 	}
 
@@ -925,8 +925,8 @@ static int azx_first_init(struct azx *chip)
 	if (azx_acquire_irq(chip, 0) < 0)
 		return -EBUSY;
 
-	strcpy(card->driver, "ft-hda");
-	strcpy(card->shortname, "ft-hda");
+	strscpy(card->driver, "ft-hda", sizeof(card->driver));
+	strscpy(card->shortname, "ft-hda", sizeof(card->shortname));
 	snprintf(card->longname, sizeof(card->longname),
 		 "%s at 0x%lx irq %i",
 		 card->shortname, bus->addr, bus->irq);
