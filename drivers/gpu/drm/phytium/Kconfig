@@ -1,6 +1,7 @@
 config DRM_PHYTIUM
 	tristate "DRM Support for Phytium Graphics Card"
 	depends on DRM
+	select FB_IOMEM_HELPERS
 	select DRM_KMS_HELPER
 	select DRM_DISPLAY_HELPER
 	select DRM_DISPLAY_DP_HELPER
