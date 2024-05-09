@@ -18,6 +18,7 @@
 #include <linux/mutex.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
+
 #include <linux/acpi.h>
 
 #define	TIMER_CTRL_REG	0x00
@@ -235,24 +236,41 @@ static const struct attribute_group *capture_groups[] = {
 
 static int phytium_tacho_get_work_mode(struct phytium_tacho *tacho)
 {
-	struct fwnode_handle *nc = dev_fwnode(tacho->dev);
+	struct device_node *nc = tacho->dev->of_node;
+	struct fwnode_handle *fwn = tacho->dev->fwnode;
 
-	if (fwnode_property_read_bool(nc, "tacho"))
+	if (of_property_read_bool(nc, "tacho"))
 		return tacho_mode;
-	if (fwnode_property_read_bool(nc, "capture"))
+	else if (has_acpi_companion(tacho->dev) && fwnode_property_read_bool(
+				fwn, "tacho"))
+		return tacho_mode;
+	if (of_property_read_bool(nc, "capture"))
+		return capture_mode;
+	else if (has_acpi_companion(tacho->dev) && fwnode_property_read_bool(
+				fwn, "capture"))
 		return capture_mode;
 	return tacho_mode;
 }
 
 static int phytium_tacho_get_edge_mode(struct phytium_tacho *tacho)
 {
-	struct fwnode_handle *nc = dev_fwnode(tacho->dev);
+	struct device_node *nc = tacho->dev->of_node;
+	struct fwnode_handle *fwn = tacho->dev->fwnode;
 
-	if (fwnode_property_read_bool(nc, "up"))
+	if (of_property_read_bool(nc, "up"))
 		return rising_edge;
-	if (fwnode_property_read_bool(nc, "down"))
+	else if (has_acpi_companion(tacho->dev) && fwnode_property_read_bool(
+				fwn, "up"))
+		return rising_edge;
+	if (of_property_read_bool(nc, "down"))
 		return falling_edge;
-	if (fwnode_property_read_bool(nc, "double"))
+	else if (has_acpi_companion(tacho->dev) && fwnode_property_read_bool(
+				fwn, "down"))
+		return falling_edge;
+	if (of_property_read_bool(nc, "double"))
+		return double_edge;
+	else if (has_acpi_companion(tacho->dev) && fwnode_property_read_bool(
+				fwn, "double"))
 		return double_edge;
 	return rising_edge;
 }
@@ -260,12 +278,16 @@ static int phytium_tacho_get_edge_mode(struct phytium_tacho *tacho)
 static int phytium_tacho_get_debounce(struct phytium_tacho *tacho)
 {
 	u32 value;
-	struct fwnode_handle *nc = dev_fwnode(tacho->dev);
+	struct device_node *nc = tacho->dev->of_node;
+	struct fwnode_handle *fwn = tacho->dev->fwnode;
 
-	if (!fwnode_property_read_u32(nc, "debounce-level", &value))
+	if (!of_property_read_u32(nc, "debounce-level", &value))
 		return value;
-	else
-		return 0;
+	if (has_acpi_companion(tacho->dev)) {
+		if (!fwnode_property_read_u32(fwn, "debounce-level", &value))
+			return value;
+	}
+	return 0;
 }
 
 static void phytium_tacho_get_of_data(struct phytium_tacho *tacho)
@@ -297,19 +319,24 @@ static int phytium_tacho_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "region map failed\n");
 		return PTR_ERR(tacho->base);
 	}
-	if (dev->of_node) {
+
+	if (!has_acpi_companion(tacho->dev)) {
 		tacho->clk = devm_clk_get(&pdev->dev, NULL);
 		if (IS_ERR(tacho->clk))
 			return PTR_ERR(tacho->clk);
 		ret = clk_prepare_enable(tacho->clk);
 		if (ret)
 			return ret;
-
 		tacho->freq = clk_get_rate(tacho->clk);
-	} else if (has_acpi_companion(dev)){
-		if(fwnode_property_read_u32(dev_fwnode(dev),"clock-frequency", (u32 *)&(tacho->freq) ) <0)
-			tacho->freq = 50000000;
-    }
+	} else {
+		u32 fre;
+
+		ret = clk_prepare_enable(tacho->clk);
+		if (ret)
+			return ret;
+		fwnode_property_read_u32(tacho->dev->fwnode, "clock-frequency", &fre);
+		tacho->freq = fre;
+	}
 
 	tacho->irq = platform_get_irq(pdev, 0);
 	if (tacho->irq < 0) {
@@ -360,19 +387,17 @@ static int phytium_tacho_resume(struct device *dev)
 
 static SIMPLE_DEV_PM_OPS(phytium_tacho_pm, phytium_tacho_suspend, phytium_tacho_resume);
 
-#ifdef CONFIG_ACPI
-static const struct acpi_device_id phytium_tacho_acpi_ids[] = {
-       { "PHYT0033", 0 },
-       { /* sentinel */ },
-};
-MODULE_DEVICE_TABLE(acpi, phytium_tacho_acpi_ids);
-#endif
-
 static const struct of_device_id tacho_of_match[] = {
 	{ .compatible = "phytium,tacho", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, tacho_of_match);
+
+static const struct acpi_device_id tacho_acpi_match[] = {
+	{ "PHYT0033", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, tacho_acpi_match);
 
 static struct platform_driver phytium_tacho_driver = {
 	.probe		= phytium_tacho_probe,
@@ -380,7 +405,7 @@ static struct platform_driver phytium_tacho_driver = {
 		.name	= "phytium_tacho",
 		.pm	= &phytium_tacho_pm,
 		.of_match_table = of_match_ptr(tacho_of_match),
-		.acpi_match_table = ACPI_PTR(phytium_tacho_acpi_ids),
+		.acpi_match_table = ACPI_PTR(tacho_acpi_match),
 	},
 };
 
