@@ -71,7 +71,7 @@ struct es8336_priv {
 	struct gpio_desc *hp_det_gpio;
 	bool muted;
 	bool hp_inserted;
-
+	bool spk_active_level;
 	u8 mic_src;
 	int pwr_count;
 };
@@ -90,7 +90,9 @@ static int es8336_reset(struct snd_soc_component *component)
 
 static void es8336_enable_spk(struct es8336_priv *es8336, bool enable)
 {
-	gpiod_set_value(es8336->spk_ctl_gpio, enable);
+	bool level;
+	level = enable ? es8336->spk_active_level : !es8336->spk_active_level;
+	gpiod_set_value(es8336->spk_ctl_gpio, level);
 }
 
 static const DECLARE_TLV_DB_SCALE(dac_vol_tlv, -9600, 50, 1);
@@ -979,8 +981,10 @@ static int es8336_i2c_probe(struct i2c_client *i2c)
 
 	if (IS_ERR_OR_NULL(es8336->spk_ctl_gpio))
 		dev_info(&i2c->dev, "Can not get spk_ctl_gpio\n");
-	else
+	else {
+		es8336->spk_active_level = 0;
 		es8336_enable_spk(es8336, false);
+	}
 
 	es8336->hp_det_gpio = devm_gpiod_get_index_optional(&i2c->dev, "det", 0,
 							GPIOD_IN);
