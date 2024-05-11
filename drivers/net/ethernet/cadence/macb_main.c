@@ -5521,6 +5521,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "xlnx,zynqmp-gem", .data = &zynqmp_config},
 	{ .compatible = "xlnx,zynq-gem", .data = &zynq_config },
 	{ .compatible = "xlnx,versal-gem", .data = &versal_config},
+	{ .compatible = "cdns,phytium-gem", .data = &phytium_gem1p0_config }, /* old version */
 	{ .compatible = "cdns,phytium-gem-1.0", .data = &phytium_gem1p0_config },
 	{ .compatible = "cdns,phytium-gem-2.0", .data = &phytium_gem2p0_config },
 	{ .compatible = "phytium,gmac-1.0", .data = &phytium_gmac_config },
