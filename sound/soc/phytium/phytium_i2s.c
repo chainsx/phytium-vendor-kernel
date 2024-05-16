@@ -1411,7 +1411,7 @@ static const struct acpi_device_id phytium_i2s_acpi_match[] = {
 	{ "PHYT0016", 0 },
 	{ }
 };
-MODULE_DEVICE_TABLE(acpi, phytium_i2s_acpi_ids);
+MODULE_DEVICE_TABLE(acpi, phytium_i2s_acpi_match);
 #else
 #define phytium_i2s_acpi_match NULL
 #endif
