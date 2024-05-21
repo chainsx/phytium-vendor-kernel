@@ -2219,13 +2219,13 @@ phytium_encoder_mode_valid(struct drm_encoder *encoder, const struct drm_display
 	case 8:
 		break;
 	default:
-		DRM_INFO("not support bpc(%d)\n", display_info->bpc);
+		DRM_DEBUG_KMS("not support bpc(%d)\n", display_info->bpc);
 		display_info->bpc = 8;
 		break;
 	}
 
 	if ((display_info->color_formats & DRM_COLOR_FORMAT_RGB444) == 0) {
-		DRM_INFO("not support color_format(%d)\n", display_info->color_formats);
+		DRM_DEBUG_KMS("not support color_format(%d)\n", display_info->color_formats);
 		display_info->color_formats = DRM_COLOR_FORMAT_RGB444;
 	}
 
