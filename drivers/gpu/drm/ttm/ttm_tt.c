@@ -415,8 +415,10 @@ static void ttm_tt_add_mapping(struct ttm_bo_device *bdev, struct ttm_tt *ttm)
 	if (ttm->page_flags & TTM_PAGE_FLAG_SG)
 		return;
 
-	for (i = 0; i < ttm->num_pages; ++i)
+	for (i = 0; i < ttm->num_pages; ++i) {
 		ttm->pages[i]->mapping = bdev->dev_mapping;
+		page_ref_inc(ttm->pages[i]);
+	}
 }
 
 int ttm_tt_populate(struct ttm_bo_device *bdev,
@@ -451,6 +453,7 @@ static void ttm_tt_clear_mapping(struct ttm_tt *ttm)
 	for (i = 0; i < ttm->num_pages; ++i) {
 		(*page)->mapping = NULL;
 		(*page++)->index = 0;
+		page_ref_dec(ttm->pages[i]);
 	}
 }
 
