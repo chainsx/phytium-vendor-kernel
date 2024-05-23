@@ -51,6 +51,8 @@ static DEFINE_SPINLOCK(protocol_lock);
 static LIST_HEAD(scmi_list);
 /* Protection for the entire list */
 static DEFINE_MUTEX(scmi_list_mutex);
+/* Protection for scmi xfer, prevent transmission timeout */
+static DEFINE_MUTEX(scmi_xfer_mutex);
 /* Track the unique id for the transfers for debug & profiling purpose */
 static atomic_t transfer_last_id;
 
@@ -1030,6 +1032,7 @@ static int scmi_wait_for_reply(struct device *dev, const struct scmi_desc *desc,
 			       struct scmi_xfer *xfer, unsigned int timeout_ms)
 {
 	int ret = 0;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
 
 	if (xfer->hdr.poll_completion) {
 		/*
@@ -1045,7 +1048,10 @@ static int scmi_wait_for_reply(struct device *dev, const struct scmi_desc *desc,
 
 			spin_until_cond(scmi_xfer_done_no_timeout(cinfo,
 								  xfer, stop));
-			if (ktime_after(ktime_get(), stop)) {
+
+			/* Poll again, timeout maybe caused by preempted */
+			if (ktime_after(ktime_get(), stop) &&
+			    !info->desc->ops->poll_done(cinfo, xfer)) {
 				dev_err(dev,
 					"timed out in resp(caller: %pS) - polling\n",
 					(void *)_RET_IP_);
@@ -1211,8 +1217,11 @@ static int do_xfer(const struct scmi_protocol_handle *ph,
 	 */
 	smp_mb();
 
+	/* lock scmi xfer, too many scmi xfers may cause timeout */
+	mutex_lock(&scmi_xfer_mutex);
 	ret = info->desc->ops->send_message(cinfo, xfer);
 	if (ret < 0) {
+		mutex_unlock(&scmi_xfer_mutex);
 		dev_dbg(dev, "Failed to send message %d\n", ret);
 		return ret;
 	}
@@ -1227,6 +1236,8 @@ static int do_xfer(const struct scmi_protocol_handle *ph,
 
 	if (info->desc->ops->mark_txdone)
 		info->desc->ops->mark_txdone(cinfo, ret, xfer);
+
+	mutex_unlock(&scmi_xfer_mutex);
 
 	trace_scmi_xfer_end(xfer->transfer_id, xfer->hdr.id,
 			    xfer->hdr.protocol_id, xfer->hdr.seq, ret);
