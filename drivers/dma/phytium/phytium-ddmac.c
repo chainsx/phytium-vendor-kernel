@@ -264,7 +264,7 @@ static void phytium_chan_start_xfer(struct phytium_ddma_chan *chan)
 		chan->desc = to_ddma_desc(vdesc);
 		chan->next_sg = 0;
 		chan->current_sg = NULL;
-		dev_dbg(chan_to_dev(chan), "xfer start\n");
+		dev_dbg(chan_to_dev(chan), "channel %d xfer start\n", chan->id);
 	}
 
 	if (chan->next_sg == chan->desc->num_sgs)
@@ -321,7 +321,8 @@ static void phytium_chan_xfer_done(struct phytium_ddma_chan *chan)
 
 		chan->busy = false;
 		if (chan->next_sg == chan->desc->num_sgs) {
-			dev_dbg(chan_to_dev(chan), "xfer complete\n");
+			dev_dbg(chan_to_dev(chan),
+				"channel %d xfer complete\n", chan->id);
 			vchan_cookie_complete(&chan->desc->vdesc);
 			chan->desc = NULL;
 			chan->current_sg = NULL;
