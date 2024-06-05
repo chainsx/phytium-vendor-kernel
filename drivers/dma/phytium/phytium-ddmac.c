@@ -939,7 +939,18 @@ static struct platform_driver phytium_driver = {
 	},
 };
 
-module_platform_driver(phytium_driver);
+static __init int phytium_ddma_init(void)
+{
+	return platform_driver_register(&phytium_driver);
+}
+
+static void __exit phytium_ddma_exit(void)
+{
+	platform_driver_unregister(&phytium_driver);
+}
+
+subsys_initcall(phytium_ddma_init);
+module_exit(phytium_ddma_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Phytium DDMA Controller platform driver");
