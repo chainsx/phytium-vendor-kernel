@@ -10,6 +10,9 @@
 #include <linux/acpi.h>
 #include <drm/drm_drv.h>
 #include <linux/dma-mapping.h>
+#include <linux/pwm.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include "phytium_display_drv.h"
 #include "phytium_platform.h"
 #include "phytium_dp.h"
@@ -125,6 +128,27 @@ phytium_platform_private_init(struct platform_device *pdev)
 			dev_err(&pdev->dev, "missing edp_mask property from dts\n");
 			goto failed;
 		}
+		if (priv->info.edp_mask) {
+			priv->info.pwm = devm_pwm_get(&pdev->dev, NULL);
+			if (IS_ERR(priv->info.pwm)) {
+				dev_err(&pdev->dev, "Failed to request PWM device: %ld\n",
+							PTR_ERR(priv->info.pwm));
+				goto failed;
+			}
+			priv->edp_bl_en = gpiod_get(&pdev->dev, "edp-bl-en", GPIOD_OUT_HIGH);
+			if (!priv->edp_bl_en) {
+				dev_err(&pdev->dev, "Failed to get edp_en gpio\n");
+				goto failed;
+			}
+			priv->edp_power_en = gpiod_get(&pdev->dev, "edp-power-en", GPIOD_OUT_HIGH);
+			if (!priv->edp_power_en) {
+				dev_err(&pdev->dev, "Failed to get edp_pwr_en gpio\n");
+				goto failed;
+			}
+			// set GPIO pin output
+			gpiod_direction_output(priv->edp_power_en, 0);
+			gpiod_direction_output(priv->edp_bl_en, 0);
+		}
 	} else if (has_acpi_companion(&pdev->dev)) {
 		phytium_info = (struct phytium_device_info *)acpi_device_get_match_data(&pdev->dev);
 		if (!phytium_info) {
@@ -143,6 +167,27 @@ phytium_platform_private_init(struct platform_device *pdev)
 		if (ret < 0) {
 			dev_err(&pdev->dev, "missing edp_mask property from acpi\n");
 			goto failed;
+		}
+		if (priv->info.edp_mask) {
+			priv->info.pwm = devm_pwm_get(&pdev->dev, NULL);
+			if (IS_ERR(priv->info.pwm)) {
+				dev_err(&pdev->dev, "Failed to request PWM device: %ld\n",
+						PTR_ERR(priv->info.pwm));
+				goto failed;
+			}
+			priv->edp_bl_en = gpiod_get(&pdev->dev, "edp-bl-en", GPIOD_OUT_HIGH);
+			if (!priv->edp_bl_en) {
+				dev_err(&pdev->dev, "Failed to get edp_en gpio\n");
+				goto failed;
+			}
+			priv->edp_power_en = gpiod_get(&pdev->dev, "edp-power-en", GPIOD_OUT_HIGH);
+			if (!priv->edp_power_en) {
+				dev_err(&pdev->dev, "Failed to get edp_pwr_en gpio\n");
+				goto failed;
+			}
+			// set GPIO pin output
+			gpiod_direction_output(priv->edp_power_en, 0);
+			gpiod_direction_output(priv->edp_bl_en, 0);
 		}
 	}
 
@@ -287,6 +332,7 @@ static const struct phytium_device_info pe220x_info = {
 	.vdisplay_max = PE220X_DC_VDISPLAY_MAX,
 	.address_mask = PE220X_DC_ADDRESS_MASK,
 	.backlight_max = PE220X_DP_BACKLIGHT_MAX,
+	.backlight_min = PE220X_DP_BACKLIGHT_MIN,
 };
 
 static const struct of_device_id display_of_match[] = {

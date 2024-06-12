@@ -2607,6 +2607,7 @@ int phytium_dp_init(struct drm_device *dev, int port)
 	if (phytium_dp_is_edp(phytium_dp, port)) {
 		phytium_dp->is_edp = true;
 		type = DRM_MODE_CONNECTOR_eDP;
+		phytium_dp->pwm = priv->info.pwm;
 		phytium_dp_panel_init_backlight_funcs(phytium_dp);
 		phytium_edp_backlight_off(phytium_dp);
 		phytium_edp_panel_poweroff(phytium_dp);
