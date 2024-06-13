@@ -3407,6 +3407,7 @@ static int macb_open(struct net_device *dev)
 		napi_enable(&queue->napi_tx);
 	}
 
+	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(MPE));
 	macb_init_hw(bp);
 
 	err = phy_power_on(bp->sgmii_phy);
