@@ -3114,6 +3114,7 @@ static int macb_open(struct net_device *dev)
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue)
 		napi_enable(&queue->napi);
 
+	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(MPE));
 	macb_init_hw(bp);
 
 	err = macb_phylink_connect(bp);
