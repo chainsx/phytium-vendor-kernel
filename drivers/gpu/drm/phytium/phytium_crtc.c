@@ -6,7 +6,11 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
+#if defined(__arm__) || defined(__aarch64__)
 #include <asm/neon.h>
+#elif defined(__x86_64)
+#include <asm/fpu/api.h>
+#endif
 #include <drm/drm_vblank.h>
 #include "phytium_display_drv.h"
 #include "phytium_crtc.h"
@@ -276,14 +280,22 @@ static void phytium_dc_scaling_config(struct drm_crtc *crtc,
 		memset(&kernel_info_width, 0, sizeof(struct filter_blit_array));
 		kernel_info_width.kernelStates = tmp;
 		memset(kernel_info_width.kernelStates, 0, KERNELSTATES);
+#if defined(__arm__) || defined(__aarch64__)
 		kernel_neon_begin();
+#elif defined(__x86_64__)
+		kernel_fpu_begin();
+#endif
 		dc_calculate_sync_table(FRAMEBUFFER_HORIZONTAL_FILTER_TAP,
 					phytium_crtc->src_width,
 					phytium_crtc->dst_width,
 					&kernel_info_width);
 		memset(kernelStates, 0, sizeof(kernelStates));
 		memcpy(kernelStates, kernel_info_width.kernelStates + 1, KERNELSTATES - 4);
+#if defined(__arm__) || defined(__aarch64__)
 		kernel_neon_end();
+#elif defined(__x86_64__)
+		kernel_fpu_end();
+#endif
 		phytium_writel_reg(priv, HORI_FILTER_INDEX,
 				   group_offset, PHYTIUM_DC_FRAMEBUFFER_HORI_FILTER_INDEX);
 		for (i = 0; i < 128; i++) {
@@ -294,12 +306,20 @@ static void phytium_dc_scaling_config(struct drm_crtc *crtc,
 		memset(&kernel_info_width, 0, sizeof(struct filter_blit_array));
 		kernel_info_width.kernelStates = tmp;
 		memset(kernel_info_width.kernelStates, 0, KERNELSTATES);
+#if defined(__arm__) || defined(__aarch64__)
 		kernel_neon_begin();
+#elif defined(__x86_64__)
+		kernel_fpu_begin();
+#endif
 		dc_calculate_sync_table(FRAMEBUFFER_FILTER_TAP, phytium_crtc->src_height,
 				     phytium_crtc->dst_height, &kernel_info_width);
 		memset(kernelStates, 0, sizeof(kernelStates));
 		memcpy(kernelStates, kernel_info_width.kernelStates + 1, KERNELSTATES - 4);
+#if defined(__arm__) || defined(__aarch64__)
 		kernel_neon_end();
+#elif defined(__x86_64__)
+		kernel_fpu_end();
+#endif
 		phytium_writel_reg(priv, VERT_FILTER_INDEX,
 				   group_offset, PHYTIUM_DC_FRAMEBUFFER_VERT_FILTER_INDEX);
 		for (i = 0; i < 128; i++)

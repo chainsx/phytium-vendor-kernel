@@ -7,7 +7,9 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
+#if defined(__arm__) || defined(__aarch64__)
 #include <asm/neon.h>
+#endif
 #include <linux/delay.h>
 #include "phytium_display_drv.h"
 #include "pe220x_reg.h"
