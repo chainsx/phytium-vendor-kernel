@@ -742,7 +742,8 @@ int add_mtd_device(struct mtd_info *mtd)
 	dev_set_name(&mtd->dev, "mtd%d", i);
 	dev_set_drvdata(&mtd->dev, mtd);
 	mtd_check_of_node(mtd);
-	of_node_get(mtd_get_of_node(mtd));
+	if (mtd->dev.of_node)
+		of_node_get(mtd_get_of_node(mtd));
 	error = device_register(&mtd->dev);
 	if (error) {
 		put_device(&mtd->dev);
@@ -903,7 +904,8 @@ static struct nvmem_device *mtd_otp_nvmem_register(struct mtd_info *mtd,
 	config.ignore_wp = true;
 	config.reg_read = reg_read;
 	config.size = size;
-	config.of_node = np;
+	if (IS_ENABLED(CONFIG_OF))
+		config.of_node = np;
 	config.priv = mtd;
 
 	nvmem = nvmem_register(&config);
@@ -911,7 +913,8 @@ static struct nvmem_device *mtd_otp_nvmem_register(struct mtd_info *mtd,
 	if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EOPNOTSUPP)
 		nvmem = NULL;
 
-	of_node_put(np);
+	if (IS_ENABLED(CONFIG_OF))
+		of_node_put(np);
 
 	return nvmem;
 }

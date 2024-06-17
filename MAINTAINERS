@@ -17478,6 +17478,7 @@ F:	drivers/mfd/phytium_px210_i2s_mmd.c
 F:	drivers/mmc/host/phytium-mci*
 F:	drivers/mmc/host/phytium-sdci.*
 F:	drivers/mtd/nand/raw/phytium_nand*
+F:	drivers/mtd/parsers/acpipart_core.c
 F:	drivers/net/can/phytium/*
 F:	drivers/net/ethernet/Kconfig
 F:	drivers/net/ethernet/Makefile
