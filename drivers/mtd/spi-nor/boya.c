@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2005, Intec Automation Inc.
- * Copyright (C) 2014, Freescale Semiconductor, Inc.
+ * Copyright (c) 2022-2024 Phytium Technology Co., Ltd.
  */
 
 #include <linux/mtd/spi-nor.h>
