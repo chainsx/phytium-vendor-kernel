@@ -359,7 +359,6 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	struct scmi_info *info = handle_to_scmi_info(handle);
 	struct device *dev = info->dev;
 	struct scmi_chan_info *cinfo;
-	unsigned long flags;
 
 	cinfo = idr_find(&info->tx_idr, xfer->hdr.protocol_id);
 	if (unlikely(!cinfo))
@@ -380,11 +379,8 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	}
 
 	if (xfer->hdr.poll_completion) {
-		ktime_t stop;
-
-		spin_lock_irqsave(&xfer->lock, flags);
-		stop = ktime_add_ms(ktime_get(),
-				    info->desc->max_rx_timeout_ms);
+		ktime_t stop = ktime_add_ms(ktime_get(),
+					    info->desc->max_rx_timeout_ms);
 
 		spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer, stop));
 
@@ -392,7 +388,6 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 			info->desc->ops->fetch_response(cinfo, xfer);
 		else
 			ret = -ETIMEDOUT;
-		spin_unlock_irqrestore(&xfer->lock, flags);
 	} else {
 		/* And we wait for the response. */
 		timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
@@ -653,7 +648,6 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 
 		xfer->tx.buf = xfer->rx.buf;
 		init_completion(&xfer->done);
-		spin_lock_init(&xfer->lock);
 	}
 
 	spin_lock_init(&info->xfer_lock);
