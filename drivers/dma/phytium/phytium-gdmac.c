@@ -446,6 +446,7 @@ static void phytium_chan_start_desc(struct phytium_gdma_chan *chan)
 		phytium_chan_write(chan, DMA_CX_TS, desc->len);
 	}
 
+	phytium_gdma_outstanding_set(chan_to_gdma(chan), desc->outstanding);
 	phytium_gdma_write_mode_set(chan_to_gdma(chan), POLLING_MODE);
 	phytium_chan_irq_enable(chan, GDMA_CX_INT_CTRL_TRANS_END_ENABLE |
 				GDMA_CX_INT_CTRL_FIFO_FULL_ENABLE);
@@ -618,15 +619,17 @@ static int phytium_gdma_xfer_bdl_mode(struct phytium_gdma_desc *desc,
 						burst_length, BURST_INCR);
 
 		bdl->dst_xfer_cfg = bdl->src_xfer_cfg;
-		dev_dbg(chan_to_dev(chan),
-				    "channel %d: bdl_mode, frame %d, "
-				    "len %d, burst_width %d, burst_length %d, "
-				    "xfer_cfg 0x%08x\n",
-				    chan->id, i, bdl->length, burst_width,
-				    burst_length, bdl->src_xfer_cfg);
 
 		/* not trigger interrupt after bdl transfered */
 		bdl->intr_ctl = 0;
+
+		dev_dbg(chan_to_dev(chan),
+				    "channel %d: bdl_mode, frame %d, "
+				    "len %d, burst_width %d, burst_length %d, "
+				    "xfer_cfg 0x%08x, outstanding: %d\n",
+				    chan->id, i, bdl->length, burst_width,
+				    burst_length, bdl->src_xfer_cfg,
+				    desc->outstanding);
 	}
 
 error_bdl:
@@ -663,6 +666,8 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 		/* bdl xfer */
 		desc->bdl_mode = true;
 		desc->bdl_size = frames;
+		desc->outstanding = min_t(u32, GDMA_MAX_OUTSTANDING,
+			len / GDMA_MAX_BURST_SIZE / GDMA_MAX_BURST_LENGTH);
 		ret = phytium_gdma_xfer_bdl_mode(desc, dst, src);
 	} else {
 		/* direct xfer */
@@ -673,11 +678,14 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 					   len / desc->burst_width);
 		desc->src = src;
 		desc->dst = dst;
+		desc->outstanding = min_t(u32, GDMA_MAX_OUTSTANDING,
+			len / desc->burst_length / desc->burst_width);
 		dev_dbg(chan_to_dev(gdma_chan),
 			"channel %d: direct mode, "
-			"len %ld, burst_width %d, burst_length %d\n",
+			"len %ld, burst_width %d, burst_length %d, "
+			"outstanding %d\n",
 			gdma_chan->id, desc->len, desc->burst_width,
-			desc->burst_length);
+			desc->burst_length, desc->outstanding);
 	}
 
 	if (!ret)

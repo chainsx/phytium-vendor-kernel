@@ -20,6 +20,8 @@
 
 #define GDMA_MAX_LEN		SZ_1G
 #define GDMA_MAX_BURST_LENGTH	8
+#define GDMA_MAX_BURST_SIZE	16
+#define GDMA_MAX_OUTSTANDING	16
 
 /* GDMA register address offset */
 #define DMA_REG_OFFSET		0x20
@@ -146,6 +148,7 @@ struct phytium_gdma_bdl_entry {
  * @burst_length: store burst length in direct xfer mode
  * @dst: store dst addr in direct xfer mode
  * @src: store src addr in direct xfer mode
+ * @outstanding: store outstanding
  * @bdl_list: the entry of bdl lists
  */
 struct phytium_gdma_desc {
@@ -158,6 +161,7 @@ struct phytium_gdma_desc {
 	u32 burst_length;
 	dma_addr_t dst;
 	dma_addr_t src;
+	u32 outstanding;
 	struct phytium_gdma_bdl_entry bdl_list[];
 };
 
