@@ -448,8 +448,7 @@ static void phytium_chan_start_desc(struct phytium_gdma_chan *chan)
 
 	phytium_gdma_outstanding_set(chan_to_gdma(chan), desc->outstanding);
 	phytium_gdma_write_mode_set(chan_to_gdma(chan), POLLING_MODE);
-	phytium_chan_irq_enable(chan, GDMA_CX_INT_CTRL_TRANS_END_ENABLE |
-				GDMA_CX_INT_CTRL_FIFO_FULL_ENABLE);
+	phytium_chan_irq_enable(chan, GDMA_CX_INT_CTRL_TRANS_END_ENABLE);
 	phytium_gdma_dump_reg(chan);
 	phytium_chan_enable(chan);
 }
