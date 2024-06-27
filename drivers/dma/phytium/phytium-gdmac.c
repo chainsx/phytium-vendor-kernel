@@ -805,6 +805,15 @@ static int phytium_gdma_probe(struct platform_device *pdev)
 	u32 i = 0;
 	int ret = 0;
 
+	if (!pdev->dev.dma_mask)
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+
+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+	if (ret) {
+		dev_err(&pdev->dev, "Unable to set DMA mask\n");
+		goto out;
+	}
+
 	gdma = devm_kzalloc(&pdev->dev, sizeof(*gdma), GFP_KERNEL);
 	if (!gdma) {
 		ret = -ENOMEM;
