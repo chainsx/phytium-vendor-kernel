@@ -11,6 +11,7 @@
 /memreserve/ 0x80000000 0x10000;
 
 #include "pe2204.dtsi"
+#include "dt-bindings/gpio/gpio.h"
 
 /{
 	model = "Phytium Pi Board";
@@ -44,8 +45,12 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,name = "phytium,pe220x-i2s-audio";
 		simple-audio-card,pin-switches = "mic-in";
-		simple-audio-card,widgets = "Microphone","mic-in";
+		simple-audio-card,widgets =
+					"Microphone","mic-in",
+					"Headphone","Headphones";
 		simple-audio-card,routing = "MIC2","mic-in";
+		simple-audio-card,hp-det-gpio = <&gpio2 11  GPIO_ACTIVE_LOW>;
+
 		simple-audio-card,cpu {
 			sound-dai = <&i2s0>;
 		};
@@ -76,8 +81,6 @@
 		status = "okay";
 
 		codec0: es8336@10 {
-			det-gpios = <&gpio2 11 0>;
-			sel-gpios = <&gpio2 7 0>;
 			#sound-dai-cells = <0>;
 			compatible = "everest,es8336";
 			reg = <0x10>;
