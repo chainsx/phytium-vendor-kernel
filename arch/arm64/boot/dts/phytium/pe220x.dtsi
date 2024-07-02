@@ -974,8 +974,7 @@
 			compatible = "phytium,gdma";
 			reg = <0x0 0x32b34000 0x0 0x1000>;
 			interrupts = <GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
-			#dma-cells = <2>;
-			dma-channels = <16>;
+			#dma-cells = <1>;
 		};
 
 		hwspinlock: spinlock@32b36000 {
