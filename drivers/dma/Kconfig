@@ -512,12 +512,12 @@ config PHYTIUM_DDMA
 	  Enable support for Phytium PE220x DDMA controller.
 
 config PHYTIUM_GDMA
-	bool "Phytium PE220x GDMA support"
+	bool "Phytium GDMA support"
 	depends on (ARCH_PHYTIUM || COMPILE_TEST)
 	select DMA_ENGINE
 	select DMA_VIRTUAL_CHANNELS
 	help
-	  Enable support for Phytium PE220x GDMA controller.
+	  Enable support for Phytium GDMA controller.
 
 config PL330_DMA
 	tristate "DMA API Driver for PL330"
