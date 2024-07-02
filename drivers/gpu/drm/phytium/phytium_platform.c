@@ -238,7 +238,22 @@ static int phytium_platform_probe(struct platform_device *pdev)
 {
 	struct phytium_display_private *priv = NULL;
 	struct drm_device *dev = NULL;
+	struct phytium_device_info *phytium_info = NULL;
 	int ret = 0;
+
+	if (pdev->dev.of_node) {
+		phytium_info = (struct phytium_device_info *)of_device_get_match_data(&pdev->dev);
+		if (phytium_info) {
+			if (phytium_info->platform_mask & BIT(PHYTIUM_PLATFORM_PE220X))
+				phytium_display_drm_driver.name = "pe220x";
+		}
+	} else if (has_acpi_companion(&pdev->dev)) {
+		phytium_info = (struct phytium_device_info *)acpi_device_get_match_data(&pdev->dev);
+		if (phytium_info) {
+			if (phytium_info->platform_mask & BIT(PHYTIUM_PLATFORM_PE220X))
+				phytium_display_drm_driver.name = "pe220x";
+		}
+	}
 
 	dev = drm_dev_alloc(&phytium_display_drm_driver, &pdev->dev);
 	if (IS_ERR(dev)) {

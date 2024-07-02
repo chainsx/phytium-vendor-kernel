@@ -262,6 +262,12 @@ static int phytium_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	struct phytium_display_private *priv = NULL;
 	struct drm_device *dev = NULL;
 	int ret = 0;
+	struct phytium_device_info *phytium_info = (struct phytium_device_info *)ent->driver_data;
+
+	if (phytium_info) {
+		if (phytium_info->platform_mask & BIT(PHYTIUM_PLATFORM_PE220X))
+			phytium_display_drm_driver.name = "pe220x";
+	}
 
 	ret = phytium_kick_out_firmware_fb(pdev);
 	if (ret)
