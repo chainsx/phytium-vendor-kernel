@@ -175,8 +175,9 @@ static void phytium_gdma_irq_enable(const struct phytium_gdma_device *gdma)
 	phytium_gdma_write(gdma, DMA_INTR_CTL, val);
 }
 
-static void __maybe_unused phytium_gdma_read_mode_set(struct phytium_gdma_device *gdma,
-				       enum arbitration_mode mode)
+static void __maybe_unused
+phytium_gdma_read_mode_set(struct phytium_gdma_device *gdma,
+			   enum arbitration_mode mode)
 {
 	u32 val = phytium_gdma_read(gdma, DMA_CTL);
 
