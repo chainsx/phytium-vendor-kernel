@@ -70,6 +70,8 @@ struct phytium_device_info {
 	unsigned char num_pipes;
 	unsigned char total_pipes;
 	unsigned char edp_mask;
+	bool bmc_mode;
+	unsigned char reserve[2];
 	unsigned int crtc_clock_max;
 	unsigned int hdisplay_max;
 	unsigned int vdisplay_max;

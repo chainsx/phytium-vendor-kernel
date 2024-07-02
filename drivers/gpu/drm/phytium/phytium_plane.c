@@ -591,7 +591,12 @@ struct phytium_plane *phytium_primary_plane_create(struct drm_device *dev, int p
 		phytium_plane->dc_hw_update_primary_hi_addr = px210_dc_hw_update_primary_hi_addr;
 		phytium_plane->dc_hw_update_cursor_hi_addr = NULL;
 	}  else if (IS_PE220X(priv)) {
-		phytium_plane->dc_hw_plane_get_format = pe220x_dc_hw_plane_get_primary_format;
+		if (priv->info.bmc_mode)
+			phytium_plane->dc_hw_plane_get_format =
+				pe220x_dc_bmc_hw_plane_get_primary_format;
+		else
+			phytium_plane->dc_hw_plane_get_format =
+				pe220x_dc_hw_plane_get_primary_format;
 		phytium_plane->dc_hw_update_dcreq = NULL;
 		phytium_plane->dc_hw_update_primary_hi_addr = pe220x_dc_hw_update_primary_hi_addr;
 		phytium_plane->dc_hw_update_cursor_hi_addr = NULL;

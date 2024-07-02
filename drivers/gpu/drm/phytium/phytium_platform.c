@@ -333,6 +333,7 @@ static const struct phytium_device_info pe220x_info = {
 	.address_mask = PE220X_DC_ADDRESS_MASK,
 	.backlight_max = PE220X_DP_BACKLIGHT_MAX,
 	.backlight_min = PE220X_DP_BACKLIGHT_MIN,
+	.bmc_mode = false,
 };
 
 static const struct of_device_id display_of_match[] = {

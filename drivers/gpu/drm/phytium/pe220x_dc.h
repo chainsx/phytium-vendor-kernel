@@ -22,6 +22,9 @@ extern int pe220x_dc_hw_fb_format_check(const struct drm_mode_fb_cmd2 *mode_cmd,
 extern void pe220x_dc_hw_plane_get_primary_format(const uint64_t **format_modifiers,
 						 const uint32_t **formats,
 						 uint32_t *format_count);
+extern void pe220x_dc_bmc_hw_plane_get_primary_format(const uint64_t **format_modifiers,
+						 const uint32_t **formats,
+						 uint32_t *format_count);
 extern void pe220x_dc_hw_plane_get_cursor_format(const uint64_t **format_modifiers,
 						const uint32_t **formats,
 						uint32_t *format_count);

@@ -592,7 +592,8 @@ phytium_crtc_atomic_enable(struct drm_crtc *crtc,
 	else
 		config &= (~FRAMEBUFFER_SCALE_ENABLE);
 
-	config |= FRAMEBUFFER_GAMMA_ENABLE;
+	if (!priv->info.bmc_mode)
+		config |= FRAMEBUFFER_GAMMA_ENABLE;
 
 	if (crtc->state->gamma_lut)
 		phytium_crtc_gamma_set(crtc);
@@ -769,6 +770,7 @@ int phytium_crtc_init(struct drm_device *dev, int phys_pipe)
 	struct phytium_crtc_state *phytium_crtc_state;
 	struct phytium_plane *phytium_primary_plane = NULL;
 	struct phytium_plane *phytium_cursor_plane = NULL;
+	struct drm_plane *cursor_base = NULL;
 	struct phytium_display_private *priv = dev->dev_private;
 	int ret;
 
@@ -811,16 +813,21 @@ int phytium_crtc_init(struct drm_device *dev, int phys_pipe)
 		goto failed_create_primary;
 	}
 
-	phytium_cursor_plane = phytium_cursor_plane_create(dev, phys_pipe);
-	if (IS_ERR(phytium_cursor_plane)) {
-		ret = PTR_ERR(phytium_cursor_plane);
-		DRM_ERROR("create cursor plane failed, phys_pipe(%d)\n", phys_pipe);
-		goto failed_create_cursor;
+	if (priv->info.bmc_mode) {
+		cursor_base = NULL;
+	} else {
+		phytium_cursor_plane = phytium_cursor_plane_create(dev, phys_pipe);
+		if (IS_ERR(phytium_cursor_plane)) {
+			ret = PTR_ERR(phytium_cursor_plane);
+			DRM_ERROR("create cursor plane failed, phys_pipe(%d)\n", phys_pipe);
+			goto failed_create_cursor;
+		}
+		cursor_base = &phytium_cursor_plane->base;
 	}
 
 	ret = drm_crtc_init_with_planes(dev, &phytium_crtc->base,
 					&phytium_primary_plane->base,
-					&phytium_cursor_plane->base,
+					cursor_base,
 					&phytium_crtc_funcs,
 					"phys_pipe %d", phys_pipe);
 
