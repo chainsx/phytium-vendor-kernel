@@ -385,8 +385,7 @@ static void phytium_chan_set_xfer_cfg(struct phytium_gdma_chan *chan,
 {
 	u32 xfer_ctl = phytium_gdma_set_xfer_ctrl(burst_width, burst_length,
 						  type);
-	u32 val = 0;
-	val = xfer_ctl << 16 | xfer_ctl;
+	u32 val = xfer_ctl << 16 | xfer_ctl;
 
 	dev_dbg(chan_to_dev(chan), "channel %d set xfer cfg 0x%08x",
 		chan->id, val);
@@ -396,8 +395,8 @@ static void phytium_chan_set_xfer_cfg(struct phytium_gdma_chan *chan,
 static void phytium_gdma_vdesc_free(struct virt_dma_desc *vd)
 {
 	struct phytium_gdma_desc *desc = to_gdma_desc(vd);
-
 	int i = 0;
+
 	if (desc->bdl_mode) {
 		for (i = 0; i < desc->bdl_size; i++)
 			dma_pool_free(desc->chan->dma_pool,
@@ -620,16 +619,13 @@ static int phytium_gdma_xfer_bdl_mode(struct phytium_gdma_desc *desc,
 
 		bdl->dst_xfer_cfg = bdl->src_xfer_cfg;
 
-		/* not trigger interrupt after bdl transfered */
+		/* not trigger interrupt after bdl transferred */
 		bdl->intr_ctl = 0;
 
 		dev_dbg(chan_to_dev(chan),
-				    "channel %d: bdl_mode, frame %d, "
-				    "len %d, burst_width %d, burst_length %d, "
-				    "xfer_cfg 0x%08x, outstanding: %d\n",
-				    chan->id, i, bdl->length, burst_width,
-				    burst_length, bdl->src_xfer_cfg,
-				    desc->outstanding);
+			"channel %d: bdl_mode, frame %d, len %d, burst_width %d, burst_length %d, xfer_cfg 0x%08x, outstanding: %d\n",
+			chan->id, i, bdl->length, burst_width, burst_length,
+			bdl->src_xfer_cfg, desc->outstanding);
 	}
 
 error_bdl:
@@ -650,7 +646,7 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 		return NULL;
 
 	frames = DIV_ROUND_UP(len, GDMA_MAX_LEN);
-	
+
 	desc = kzalloc(struct_size(desc, bdl_list, frames), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(desc))
 		return NULL;
@@ -680,10 +676,7 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 		desc->dst = dst;
 		desc->outstanding = min_t(u32, GDMA_MAX_OUTSTANDING,
 			len / desc->burst_length / desc->burst_width);
-		dev_dbg(chan_to_dev(gdma_chan),
-			"channel %d: direct mode, "
-			"len %ld, burst_width %d, burst_length %d, "
-			"outstanding %d\n",
+		dev_dbg(chan_to_dev(gdma_chan), "channel %d: direct mode, len %ld, burst_width %d, burst_length %d, outstanding %d\n",
 			gdma_chan->id, desc->len, desc->burst_width,
 			desc->burst_length, desc->outstanding);
 	}
