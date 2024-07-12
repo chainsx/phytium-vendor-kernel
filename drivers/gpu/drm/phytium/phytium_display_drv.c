@@ -53,7 +53,7 @@ int phytium_wait_cmd_done(struct phytium_display_private *priv,
 				    uint32_t request_bit,
 				    uint32_t reply_bit)
 {
-	int timeout = 500, config = 0, ret = 0;
+	int timeout = 1000, config = 0, ret = 0;
 
 	do {
 		mdelay(1);
