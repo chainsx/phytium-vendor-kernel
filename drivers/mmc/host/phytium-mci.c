@@ -873,6 +873,13 @@ static void phytium_mci_ops_request(struct mmc_host *mmc, struct mmc_request *mr
 	if (rc == -ETIMEDOUT)
 		pr_debug("%s %d, timeout mci_status: 0x%08x\n", __func__, __LINE__, data);
 
+	rc = readl_relaxed_poll_timeout(host->base + MCI_CMD,
+					 data,
+					 !(data & MCI_CMD_START),
+					 0, 500 * 1000);
+	if (rc == -ETIMEDOUT)
+		pr_debug("%s %d, timeout mci_cmd.start_cmd bit clear: 0x%08x\n", __func__, __LINE__, data);
+
 	dev_dbg(host->dev, "%s %d: cmd:%d arg:0x%x\n", __func__, __LINE__,
 		mrq->cmd->opcode, mrq->cmd->arg);
 
