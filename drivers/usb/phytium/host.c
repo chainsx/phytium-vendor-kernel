@@ -2048,6 +2048,12 @@ unsigned int get_endpoint_interval(struct usb_endpoint_descriptor desc, int spee
 		if (usb_endpoint_xfer_control(&desc) || usb_endpoint_xfer_bulk(&desc)) {
 			if (desc.bInterval == 0)
 				return interval;
+
+			if (usb_endpoint_xfer_bulk(&desc)) {
+				interval = 1;
+				return interval;
+			}
+
 			interval = fls(desc.bInterval) - 1;
 			interval = clamp_val(interval, 0, 15);
 			interval = 1 << interval;
