@@ -469,6 +469,7 @@ module_init(phytium_display_init);
 module_exit(phytium_display_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DC_DRIVER_VERSION);
 MODULE_AUTHOR("Yang Xun <yangxun@phytium.com.cn>");
 MODULE_AUTHOR("Shaojun Yang <yangshaojun@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium Display Controller");

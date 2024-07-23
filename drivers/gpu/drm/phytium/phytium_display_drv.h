@@ -25,6 +25,7 @@
 #define DRV_DATE	"20201220"
 #define DRV_MAJOR	1
 #define DRV_MINOR	1
+#define DC_DRIVER_VERSION "1.0.0"
 
 /* come from GPU */
 #define	DRM_FORMAT_MOD_VENDOR_PHYTIUM	0x92
