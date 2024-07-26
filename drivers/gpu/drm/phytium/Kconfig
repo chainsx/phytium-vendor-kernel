@@ -2,6 +2,7 @@ config DRM_PHYTIUM
 	tristate "DRM Support for Phytium Graphics Card"
 	depends on DRM
 	select DRM_KMS_HELPER
+	select BACKLIGHT_CLASS_DEVICE
 	help
 	  Choose this option if you have a phytium graphics card.
 	  This driver provides kernel mode setting and buffer management to userspace.
