@@ -29,6 +29,7 @@
 #include <asm/barrier.h>
 #include "phytium-gdmac.h"
 
+#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.0"
 
 static inline struct phytium_gdma_device *to_gdma_device(struct dma_chan *chan)
 {
@@ -1002,3 +1003,4 @@ module_exit(phytium_gdma_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Phytium gdma Controller platform driver");
 MODULE_AUTHOR("HuangJie <huangjie1663@phytium.com.cn>");
+MODULE_VERSION(PHYTIUM_GDMA_DRIVER_VERSION);
