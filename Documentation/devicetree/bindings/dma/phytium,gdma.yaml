@@ -27,20 +27,34 @@ properties:
     maxItems: 1
 
   interrupts:
-    maxItems: 1
+    minItems: 1
+    description: set interrupts according to the programming manual
+
+  dma-channels:
+    minimum: 1
+    maximum: 16
+
+  max-outstanding:
+    minimum: 1
+    maximum: 64
+    description: set interrupmax-outstandingts according to the programming manual
 
 required:
   - compatible
   - reg
   - interrupts
+  - dma-channels
+  - max-outstanding
 
 unevaluatedProperties: false
 
 examples:
-		gdma: gdma@32b34000 {
-			compatible = "phytium,gdma";
-			reg = <0x0 0x32b34000 0x0 0x1000>;
-			interrupts = <GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
-			#dma-cells = <1>;
-		};
-...
+  - |
+    gdma: gdma@32b34000 {
+      compatible = "phytium,gdma";
+      dma-channels = <16>;
+      max-outstanding = <16>;
+      reg = <0x0 0x32b34000 0x0 0x1000>;
+      interrupts = <GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
+      #dma-cells = <1>;
+    };
