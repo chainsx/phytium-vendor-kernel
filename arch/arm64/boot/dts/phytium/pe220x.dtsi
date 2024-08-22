@@ -961,6 +961,8 @@
 
 		gdma: gdma@32b34000 {
 			compatible = "phytium,gdma";
+			dma-channels = <16>;
+			max-outstanding = <16>;
 			reg = <0x0 0x32b34000 0x0 0x1000>;
 			interrupts = <GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>;
 			#dma-cells = <1>;
