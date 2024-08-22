@@ -641,6 +641,7 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 	struct phytium_gdma_desc *desc = NULL;
 	struct dma_async_tx_descriptor *tx_desc = NULL;
 	u32 frames = 0;
+	u32 max_outstanding = 0;
 	int ret = 0;
 
 	if (!src || !dst || !len)
@@ -658,12 +659,13 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 
 	desc->len = len;
 	desc->chan = gdma_chan;
+	max_outstanding = chan_to_gdma(gdma_chan)->max_outstanding;
 
 	if (frames > 1) {
 		/* bdl xfer */
 		desc->bdl_mode = true;
 		desc->bdl_size = frames;
-		desc->outstanding = min_t(u32, GDMA_MAX_OUTSTANDING,
+		desc->outstanding = min_t(u32, max_outstanding,
 			len / GDMA_MAX_BURST_SIZE / GDMA_MAX_BURST_LENGTH);
 		ret = phytium_gdma_xfer_bdl_mode(desc, dst, src);
 	} else {
@@ -675,7 +677,7 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 					   len / desc->burst_width);
 		desc->src = src;
 		desc->dst = dst;
-		desc->outstanding = min_t(u32, GDMA_MAX_OUTSTANDING,
+		desc->outstanding = min_t(u32, max_outstanding,
 			len / desc->burst_length / desc->burst_width);
 		dev_dbg(chan_to_dev(gdma_chan), "channel %d: direct mode, len %ld, burst_width %d, burst_length %d, outstanding %d\n",
 			gdma_chan->id, desc->len, desc->burst_width,
@@ -749,7 +751,7 @@ static irqreturn_t phytium_dma_interrupt(int irq, void *dev_id)
 	state = phytium_gdma_read(gdma, DMA_STATE);
 	dev_dbg(gdma->dev, "gdma interrupt, state %04x", state);
 
-	for (i = 0; i < GDMA_MAX_NR_CHANNELS; i++) {
+	for (i = 0; i < gdma->dma_channels; i++) {
 		if (state & DMA_CX_INTR_STATE(i)) {
 			gdma_chan = &gdma->chan[i];
 			gdma_chan->state = phytium_chan_read(gdma_chan,
@@ -757,8 +759,9 @@ static irqreturn_t phytium_dma_interrupt(int irq, void *dev_id)
 			phytium_chan_irq_clear(gdma_chan);
 
 			if (gdma->chan[i].desc) {
-				phytium_chan_disable(gdma_chan);
 				phytium_chan_irq_handler(gdma_chan);
+				phytium_chan_disable(gdma_chan);
+				phytium_chan_clk_disable(gdma_chan);
 			}
 		}
 	}
@@ -798,6 +801,10 @@ static int phytium_gdma_probe(struct platform_device *pdev)
 	struct dma_device *dma_dev;
 	struct resource *mem;
 	u32 i = 0;
+	u32 nr_channels = 0;
+	u32 max_outstanding = 0;
+	int irq_count = 0;
+	int irq = 0;
 	int ret = 0;
 
 	if (!pdev->dev.dma_mask)
@@ -818,13 +825,6 @@ static int phytium_gdma_probe(struct platform_device *pdev)
 	dma_dev = &gdma->dma_dev;
 	gdma->dev = &pdev->dev;
 
-	gdma->irq = platform_get_irq(pdev, 0);
-	if (gdma->irq < 0) {
-		dev_err(&pdev->dev, "no irq resource\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	gdma->base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(gdma->base)) {
@@ -833,13 +833,42 @@ static int phytium_gdma_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	gdma->dma_channels = GDMA_MAX_NR_CHANNELS;
-
-	ret = devm_request_irq(&pdev->dev, gdma->irq, phytium_dma_interrupt,
-			       IRQF_SHARED, dev_name(&pdev->dev), gdma);
-	if (ret) {
-		dev_err(&pdev->dev, "could not to request irq %d", gdma->irq);
+	ret = of_property_read_u32(pdev->dev.of_node, "dma-channels",
+				   &nr_channels);
+	if (ret < 0) {
+		dev_err(&pdev->dev,
+			"can't get the number of dma channels: %d\n", ret);
 		goto out;
+	}
+	gdma->dma_channels = nr_channels;
+
+	ret = of_property_read_u32(pdev->dev.of_node, "max-outstanding",
+				   &max_outstanding);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "can't get max outstanding %d\n", ret);
+		goto out;
+	}
+	gdma->max_outstanding = max_outstanding;
+
+	irq_count = platform_irq_count(pdev);
+	if (irq_count <= 0) {
+		dev_err(&pdev->dev, "no irq found\n");
+		ret = -EINVAL;
+		goto out;
+	}
+	for (i = 0; i < irq_count; i++) {
+		irq = platform_get_irq(pdev, i);
+		if (irq < 0) {
+			dev_err(&pdev->dev, "can't get irq %d\n", i);
+			continue;
+		}
+		ret = devm_request_irq(&pdev->dev, irq,
+				       phytium_dma_interrupt, IRQF_SHARED,
+				       dev_name(&pdev->dev), gdma);
+		if (ret) {
+			dev_err(&pdev->dev, "could not to request irq %d", irq);
+			goto out;
+		}
 	}
 
 	/* Set capabilities */
