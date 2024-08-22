@@ -15,13 +15,10 @@
 #include <linux/types.h>
 #include "../virt-dma.h"
 
-/* the number of physical channel */
-#define GDMA_MAX_NR_CHANNELS	16
 
 #define GDMA_MAX_LEN		SZ_1G
 #define GDMA_MAX_BURST_LENGTH	8
 #define GDMA_MAX_BURST_SIZE	16
-#define GDMA_MAX_OUTSTANDING	16
 
 /* GDMA register address offset */
 #define DMA_REG_OFFSET		0x20
@@ -188,17 +185,17 @@ struct phytium_gdma_chan {
 /**
  * struct phytium_gdma_device - the struct holding info describing gdma device
  * @dma_dev: an instance for struct dma_device
- * @irq: the irq that gdma using
  * @base: the mapped register I/O base of this gdma
  * @dma_channels: the number of gdma channels
+ * @max_outstanding: the max outstanding support
  * @chan: the phyical channels of gdma
  */
 struct phytium_gdma_device {
 	struct dma_device dma_dev;
 	struct device *dev;
-	int irq;
 	void __iomem *base;
 	u32 dma_channels;
+	u32 max_outstanding;
 	struct phytium_gdma_chan *chan;
 };
 
