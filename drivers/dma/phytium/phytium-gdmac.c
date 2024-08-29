@@ -29,7 +29,7 @@
 #include <asm/barrier.h>
 #include "phytium-gdmac.h"
 
-#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.0"
+#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.1"
 
 static inline struct phytium_gdma_device *to_gdma_device(struct dma_chan *chan)
 {
