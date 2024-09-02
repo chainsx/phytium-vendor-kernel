@@ -37,7 +37,8 @@ static const struct fb_ops phytium_fbdev_ops = {
 	.fb_mmap = phytium_fbdev_mmap,
 	.fb_destroy = phytium_fbdev_destroy,
 	 DRM_FB_HELPER_DEFAULT_OPS,
-	 FB_DEFAULT_IOMEM_OPS,
+	__FB_DEFAULT_IOMEM_OPS_RDWR,
+	__FB_DEFAULT_IOMEM_OPS_DRAW,
 };
 
 static int
