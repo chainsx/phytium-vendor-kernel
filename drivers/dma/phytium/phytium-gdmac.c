@@ -29,7 +29,7 @@
 #include <asm/barrier.h>
 #include "phytium-gdmac.h"
 
-#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.1"
+#define PHYTIUM_GDMA_DRIVER_VERSION	"1.0.2"
 
 static inline struct phytium_gdma_device *to_gdma_device(struct dma_chan *chan)
 {
@@ -396,12 +396,12 @@ static void phytium_chan_set_xfer_cfg(struct phytium_gdma_chan *chan,
 static void phytium_gdma_vdesc_free(struct virt_dma_desc *vd)
 {
 	struct phytium_gdma_desc *desc = to_gdma_desc(vd);
-	int i = 0;
+	struct phytium_gdma_chan *chan = desc->chan;
 
 	if (desc->bdl_mode) {
-		for (i = 0; i < desc->bdl_size; i++)
-			dma_pool_free(desc->chan->dma_pool,
-				desc->bdl_list[i].bdl, desc->bdl_list[0].paddr);
+		dma_free_coherent(chan_to_dev(desc->chan),
+			sizeof(struct phytium_gdma_bdl) * desc->bdl_size,
+			chan->bdl_list, chan->paddr);
 	}
 	kfree(desc);
 }
@@ -425,13 +425,14 @@ static void phytium_chan_start_desc(struct phytium_gdma_chan *chan)
 	if (desc->bdl_mode) {
 		phytium_chan_set_bdl_mode(chan, true);
 		phytium_chan_write(chan, DMA_CX_UPSADDR,
-				   upper_32_bits(desc->bdl_list[0].paddr));
+				   upper_32_bits(chan->paddr));
 		phytium_chan_write(chan, DMA_CX_LWSADDR,
-				   lower_32_bits(desc->bdl_list[0].paddr));
+				   lower_32_bits(chan->paddr));
 		phytium_chan_write(chan, DMA_CX_UPDADDR, 0);
 		phytium_chan_write(chan, DMA_CX_LWDADDR, 0);
 		phytium_chan_write(chan, DMA_CX_TS, 0);
 		phytium_chan_write(chan, DMA_CX_LVI, desc->bdl_size - 1);
+		phytium_chan_write(chan, DMA_CX_XFER_CFG, 0);
 	} else {
 		phytium_chan_set_bdl_mode(chan, false);
 		phytium_chan_set_xfer_cfg(chan, desc->burst_width,
@@ -480,6 +481,8 @@ static int phytium_gdma_terminate_all(struct dma_chan *chan)
 
 	spin_lock_irqsave(&gdma_chan->vchan.lock, flags);
 
+	phytium_gdma_dump_reg(gdma_chan);
+
 	if (gdma_chan->desc) {
 		vchan_terminate_vdesc(&gdma_chan->desc->vdesc);
 		gdma_chan->desc = NULL;
@@ -503,22 +506,11 @@ static int phytium_gdma_alloc_chan_resources(struct dma_chan *chan)
 {
 	struct phytium_gdma_device *gdma = to_gdma_device(chan);
 	struct phytium_gdma_chan *gdma_chan = to_gdma_chan(chan);
-	struct device *dev = chan_to_dev(gdma_chan);
 
 	/* prepare channel */
 	phytium_chan_disable(gdma_chan);
 	phytium_chan_reset(gdma_chan);
 	phytium_chan_irq_clear(gdma_chan);
-
-	/* alloc dma memory */
-	gdma_chan->dma_pool = dma_pool_create(dev_name(dev), dev,
-					      sizeof(struct phytium_gdma_bdl),
-					      128, 0);
-	if (!gdma_chan->dma_pool) {
-		dev_err(chan_to_dev(gdma_chan),
-			"unable to allocate descriptor pool\n");
-		return -ENOMEM;
-	}
 
 	dev_info(gdma->dev, "alloc channel %d\n", gdma_chan->id);
 
@@ -534,7 +526,6 @@ static void phytium_gdma_free_chan_resources(struct dma_chan *chan)
 	phytium_chan_irq_disable(gdma_chan);
 
 	vchan_free_chan_resources(&gdma_chan->vchan);
-	dma_pool_destroy(gdma_chan->dma_pool);
 
 	dev_dbg(gdma->dev, "free channel %d\n", gdma_chan->id);
 }
@@ -580,7 +571,6 @@ static int phytium_gdma_xfer_bdl_mode(struct phytium_gdma_desc *desc,
 				       dma_addr_t dst, dma_addr_t src)
 {
 	struct phytium_gdma_chan *chan = desc->chan;
-	struct phytium_gdma_bdl_entry *bdl_entry = NULL;
 	struct phytium_gdma_bdl *bdl = NULL;
 	int i = 0;
 	int ret = 0;
@@ -588,22 +578,25 @@ static int phytium_gdma_xfer_bdl_mode(struct phytium_gdma_desc *desc,
 	u32 burst_length = 0;
 	size_t buf_len = desc->len;
 
-	for (i = 0; i < desc->bdl_size; i++) {
-		bdl_entry = &desc->bdl_list[i];
-		bdl_entry->bdl = dma_pool_alloc(chan->dma_pool, GFP_KERNEL,
-						&bdl_entry->paddr);
+	chan->bdl_list = dma_alloc_coherent(chan_to_dev(chan),
+			sizeof(struct phytium_gdma_bdl) * desc->bdl_size,
+			&chan->paddr, GFP_KERNEL);
+	if (!chan->bdl_list) {
+		dev_err(chan_to_dev(chan), "channel %d: unable to allocate bdl list\n",
+			chan->id);
+		ret = -ENOMEM;
+		goto error_bdl;
+	}
 
-		if (!bdl_entry->bdl) {
-			ret = -ENOMEM;
-			goto error_bdl;
-		}
+	for (i = 0; i < desc->bdl_size; i++) {
+		bdl = &chan->bdl_list[i];
 
 		/* set bdl info */
-		bdl = bdl_entry->bdl;
 		bdl->src_addr_l = lower_32_bits(src);
 		bdl->src_addr_h = upper_32_bits(src);
 		bdl->dst_addr_l = lower_32_bits(dst);
 		bdl->dst_addr_h = upper_32_bits(dst);
+
 		bdl->length = min_t(u32, buf_len, GDMA_MAX_LEN);
 		buf_len -= bdl->length;
 		src += bdl->length;
@@ -649,12 +642,12 @@ static struct dma_async_tx_descriptor *phytium_gdma_prep_dma_memcpy(
 
 	frames = DIV_ROUND_UP(len, GDMA_MAX_LEN);
 
-	desc = kzalloc(struct_size(desc, bdl_list, frames), GFP_KERNEL);
+	desc = kzalloc(sizeof(struct phytium_gdma_desc), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(desc))
 		return NULL;
 
 	dev_dbg(chan_to_dev(gdma_chan),
-		"memcpy: src %lld, dst %lld, len %ld, frames %d\n",
+		"memcpy: src %llx, dst %llx, len %ld, frames %d\n",
 		src, dst, len, frames);
 
 	desc->len = len;

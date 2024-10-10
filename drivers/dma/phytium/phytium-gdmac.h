@@ -124,16 +124,6 @@ struct phytium_gdma_bdl {
 };
 
 /**
- * @brief struct phytium_gdma_bdl_entry - entry for bdl_list
- * @bdl: pointer to bdl lists
- * @paddr: the first bdl list addr
- */
-struct phytium_gdma_bdl_entry {
-	struct phytium_gdma_bdl *bdl;
-	dma_addr_t paddr;
-};
-
-/**
  * struct phytium_gdma_desc - the struct holding info describing gdma request
  * descriptor
  * @chan: the channel belonging to this descriptor
@@ -146,7 +136,6 @@ struct phytium_gdma_bdl_entry {
  * @dst: store dst addr in direct xfer mode
  * @src: store src addr in direct xfer mode
  * @outstanding: store outstanding
- * @bdl_list: the entry of bdl lists
  */
 struct phytium_gdma_desc {
 	struct phytium_gdma_chan *chan;
@@ -159,7 +148,6 @@ struct phytium_gdma_desc {
 	dma_addr_t dst;
 	dma_addr_t src;
 	u32 outstanding;
-	struct phytium_gdma_bdl_entry bdl_list[];
 };
 
 /**
@@ -167,15 +155,18 @@ struct phytium_gdma_desc {
  * @vchan: virtual dma channel
  * @dma_config: config parameters for dma channel
  * @desc: the transform request descriptor
- * @dma_pool: dma memory for bdl list
+ * @bdl_list: the pointer of bdl
+ * @paddr: the dma address of bdl
  * @id: the id of gdma physical channel
  * @base: the mapped register I/O of dma physical channel
+ * @state: channel transfer state
  */
 struct phytium_gdma_chan {
 	struct virt_dma_chan vchan;
 	struct dma_slave_config dma_config;
 	struct phytium_gdma_desc *desc;
-	struct dma_pool *dma_pool;
+	struct phytium_gdma_bdl *bdl_list;
+	dma_addr_t paddr;
 
 	void __iomem *base;
 	u32 id;
