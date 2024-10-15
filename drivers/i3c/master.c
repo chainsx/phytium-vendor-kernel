@@ -2405,13 +2405,16 @@ static int i3c_acpi_master_add_dev(struct acpi_device *adev, void *data)
 static void i3c_acpi_register_devices(struct i3c_master_controller *master)
 {
 	struct acpi_device *adev = NULL;
+	struct acpi_device *child;
 
 	if (!has_acpi_companion(master->dev.parent))
 		return;
 
-	adev = acpi_fetch_acpi_dev(ACPI_HANDLE(master->dev.parent));
-	if (adev)
-		acpi_dev_for_each_child(adev, i3c_acpi_master_add_dev, master);
+	acpi_bus_get_device(ACPI_HANDLE(master->dev.parent), &adev);
+	if (adev) {
+		list_for_each_entry(child, &adev->children, node)
+			i3c_acpi_master_add_dev(child, master);
+	}
 }
 #endif
 
