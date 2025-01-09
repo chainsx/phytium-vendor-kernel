@@ -1958,7 +1958,8 @@ static int macb_tx_restart(struct macb_queue *queue)
 	if (head == tail)
 		return -ENXIO;
 
-	tbqp = queue_readl(queue, TBQP) / macb_dma_desc_get_size(bp);
+	tbqp = queue_readl(queue, TBQP) - lower_32_bits(queue->tx_ring_dma);
+	tbqp = tbqp / macb_dma_desc_get_size(bp);
 	tbqp = macb_adj_dma_desc_idx(bp, macb_tx_ring_wrap(bp, tbqp));
 	head_idx = macb_adj_dma_desc_idx(bp, macb_tx_ring_wrap(bp, head));
 
