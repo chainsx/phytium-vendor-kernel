@@ -11,3 +11,6 @@ obj-$(CONFIG_SND_PMDK_ES8336) += snd-soc-pmdk-es8336.o
 
 snd-soc-pmdk-dp-objs :=pmdk_dp.o
 obj-$(CONFIG_SND_PMDK_DP) += snd-soc-pmdk-dp.o
+
+snd-soc-pmdk-ma1026-objs :=pmdk_ma1026.o
+obj-$(CONFIG_SND_PMDK_MA1026) += snd-soc-pmdk-ma1026.o
